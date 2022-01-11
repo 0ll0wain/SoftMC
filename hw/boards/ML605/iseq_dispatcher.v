@@ -59,7 +59,15 @@ module iseq_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 1
    output aref_set_interval,
    output[27:0] aref_interval, 
    output aref_set_trfc,
-   output[27:0] aref_trfc
+   output[27:0] aref_trfc,
+	
+	//DRP
+	output saddr, 
+	output sen,
+	output par_wr_en,
+	output [7:0] clkfbout_mult,
+	output [7:0]divclk_divide,
+	output [7:0] clkout_divide
 );
 
 	reg dispatcher_busy_r = 1'b0, dispatcher_busy_ns;
@@ -161,7 +169,15 @@ module iseq_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 1
 	.aref_set_interval(aref_set_interval),
 	.aref_interval(aref_interval),
 	.aref_set_trfc(aref_set_trfc),
-	.aref_trfc(aref_trfc)
+	.aref_trfc(aref_trfc),
+	
+	//DRP
+	.SADDR(saddr),
+	.SEN (sen),
+	.PARAMETER_WRITE_ENABLE (par_wr_en),
+	.CLKFBOUT_MULT	(clkfbout_mult),
+	.DIVCLK_DIVIDE (divclk_divide),
+	.CLKOUT_DIVIDE	(clkout_divide)
 );
 	
 	assign dispatcher_busy = dispatcher_busy_r;

@@ -58,7 +58,15 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
    output reg aref_set_interval,
    output reg[27:0] aref_interval, 
    output reg aref_set_trfc,
-   output reg[27:0] aref_trfc
+   output reg[27:0] aref_trfc,
+	
+	output reg SADDR,
+	output reg SEN,
+	output reg PARAMETER_WRITE_ENABLE,
+	output reg 	[7:0]	CLKFBOUT_MULT,
+	output reg	[7:0]	DIVCLK_DIVIDE,
+	output reg	[7:0]	CLKOUT_DIVIDE
+	
 );
 	
 	localparam ONE = 1;
@@ -106,6 +114,14 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 	//auto-refresh
 	reg aref_set_interval_ns, aref_set_trfc_ns;
 	reg[27:0] aref_interval_ns, aref_trfc_ns;
+	
+	//clk reprogramming
+	reg SADDR_ns;
+	reg SEN_ns;
+	reg PARAMETER_WRITE_ENABLE_ns;
+	reg 	[7:0]	CLKFBOUT_MULT_ns;
+	reg	[7:0]	DIVCLK_DIVIDE_ns;
+	reg	[7:0]	CLKOUT_DIVIDE_ns;
 	
 	//Counter saturating at zero
 	reg load_counter;
@@ -155,6 +171,13 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 		aref_interval_ns = {28{1'bx}};
 		aref_set_trfc_ns = 1'b0;
 		aref_trfc_ns = {28{1'bx}};
+		
+		SADDR_ns = 0;
+		SEN_ns = 0;
+		PARAMETER_WRITE_ENABLE_ns = 0;
+		CLKFBOUT_MULT_ns = 2;
+		DIVCLK_DIVIDE_ns = 1;
+		CLKOUT_DIVIDE_ns = 2;
 		
 		wait_cycles_ns = 10'dx;
 		load_counter = LOW;
@@ -223,6 +246,22 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 						aref_set_trfc_ns = 1'b1;
 						aref_trfc_ns = instr0[27:0];
 					end //SET_TRFC
+					
+					`PROGRAM_CLK: begin
+						if (instr0[27])begin //use default, if bit 27 is set
+							   SADDR_ns = 1'b0;			//0 = Default State1, 1 = Programmable
+								SEN_ns = 1'b1;
+						end
+						else begin //use Parameters given in instr Payload
+							SADDR_ns = 1'b1;			//0 = Default State1, 1 = Programmable
+							SEN_ns = 1'b1;
+							PARAMETER_WRITE_ENABLE_ns = 1'b1;
+							CLKFBOUT_MULT_ns = instr0[7:0];
+							DIVCLK_DIVIDE_ns = instr0[15:8];
+							CLKOUT_DIVIDE_ns = instr0[23:16];
+						end
+					end 
+					
 				
 				endcase //instr0
 			end //en0
@@ -286,6 +325,21 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 						aref_trfc_ns = instr1[27:0];
 					end //SET_TRFC
 					
+					`PROGRAM_CLK: begin
+						if (instr0[27])begin //use default, if bit 27 is set
+							   SADDR_ns = 1'b0;			//0 = Default State1, 1 = Programmable
+								SEN_ns = 1'b1;
+						end
+						else begin //use Parameters given in instr Payload
+							SADDR_ns = 1'b1;			//0 = Default State1, 1 = Programmable
+							SEN_ns = 1'b1;
+							PARAMETER_WRITE_ENABLE_ns = 1'b1;
+							CLKFBOUT_MULT_ns = instr0[7:0];
+							DIVCLK_DIVIDE_ns = instr0[15:8];
+							CLKOUT_DIVIDE_ns = instr0[23:16];
+						end
+					end 
+					
 				endcase //instr1
 			end //en1
 		end
@@ -320,6 +374,25 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 	
 	assign dfi_wrdata_mask = 0;
 	assign dfi_wrdata = dfi_cas_n0 ? {4*(DQ_WIDTH/8){write_burst_data_r}} : {4*(DQ_WIDTH/8){write_burst_data_ns}};
+	
+	always@(posedge clk) begin
+		if(rst) begin
+			SADDR <= 0;
+			SEN <= 0;
+			PARAMETER_WRITE_ENABLE <= 0;
+			CLKFBOUT_MULT <= 2;
+			DIVCLK_DIVIDE <= 1;
+			CLKOUT_DIVIDE <= 2;
+		end
+		else begin
+			SADDR <= SADDR_ns;
+			SEN <= SEN_ns;
+			PARAMETER_WRITE_ENABLE <= PARAMETER_WRITE_ENABLE_ns;
+			CLKFBOUT_MULT <= CLKFBOUT_MULT_ns;
+			DIVCLK_DIVIDE <= DIVCLK_DIVIDE_ns;
+			CLKOUT_DIVIDE <= CLKOUT_DIVIDE_ns;
+		end
+	end
 	
 	always@(posedge clk) begin
 		pr_rd_ack_r <= pr_rd_ack_ns;

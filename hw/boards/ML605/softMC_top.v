@@ -159,6 +159,15 @@ module softMC_top #
 	 wire mmcm_clk;
 	 wire sys_clk = 0;
 	 
+	 //DRP
+	 wire saddr; 
+	 wire sen; 
+	 wire par_wr_en; 
+	 wire clkfbout_mult;
+	 wire divclk_divide;
+	 wire clkout_divide;
+	
+	 
 	 //use 200MHZ refrence clock to generate mmcm_clk
 	 iodelay_ctrl #
     (
@@ -177,7 +186,7 @@ module softMC_top #
        .iodelay_ctrl_rdy (iodelay_ctrl_rdy) //output
        );
 		 
-	 infrastructure #
+	 infrastructure_mod	 #
     (
      .TCQ                (TCQ),
      .CLK_PERIOD         (SYSCLK_PERIOD),
@@ -188,8 +197,8 @@ module softMC_top #
      .CLKOUT_DIVIDE      (CLKOUT_DIVIDE),
      .RST_ACT_LOW        (RST_ACT_LOW)
      )
-    u_infrastructure
-      (
+    infrastructure_inst
+      ( 	 
        .clk_mem          (clk_mem), //output
        .clk              (clk), //output
        .clk_rd_base      (clk_rd_base), //output
@@ -200,7 +209,15 @@ module softMC_top #
        .iodelay_ctrl_rdy (iodelay_ctrl_rdy), //input
        .PSDONE           (pd_PSDONE), //output
        .PSEN             (pd_PSEN), //input
-       .PSINCDEC         (pd_PSINCDEC) //input
+       .PSINCDEC         (pd_PSINCDEC), //input
+		 
+		//DRP
+		 .saddr(saddr), 
+		 .sen(sen), 
+		 .par_wr_en(par_wr_en), 
+		 .clkfbout_mult(clkfbout_mult), 
+		 .divclk_divide(divclk_divide), 
+		 .clkout_divide(clkout_divide)
        );
 		 
 		 
@@ -381,6 +398,7 @@ module softMC_top #
 	`endif //SIM
 	
 	
+	
 	 softMC #(.TCQ(TCQ), .tCK(tCK), .nCK_PER_CLK(nCK_PER_CLK), .RANK_WIDTH(RANK_WIDTH), .ROW_WIDTH(ROW_WIDTH), .BANK_WIDTH(BANK_WIDTH), 
 								.CKE_WIDTH(CKE_WIDTH), .CS_WIDTH(CS_WIDTH), .nCS_PER_RANK(nCS_PER_RANK), .DQ_WIDTH(DQ_WIDTH)) i_softmc(
 	.clk(clk),
@@ -433,7 +451,15 @@ module softMC_top #
 	//Data read back Interface
 	.rdback_fifo_empty(rdback_fifo_empty),
 	.rdback_fifo_rden(rdback_fifo_rden),
-	.rdback_data(rdback_data)
+	.rdback_data(rdback_data),
+	
+	//DRP
+	 .saddr(saddr), 
+	 .sen(sen), 
+	 .par_wr_en(par_wr_en), 
+	 .clkfbout_mult(clkfbout_mult), 
+	 .divclk_divide(divclk_divide), 
+	 .clkout_divide(clkout_divide)
 );
 
 `ifndef SIM

@@ -55,7 +55,16 @@ module softMC #(parameter TCQ = 100, tCK = 2500, nCK_PER_CLK = 2, RANK_WIDTH = 1
 	//Data read back Interface
 	output rdback_fifo_empty,
 	input rdback_fifo_rden,
-	output[DQ_WIDTH*4 - 1:0] rdback_data
+	output[DQ_WIDTH*4 - 1:0] rdback_data,
+	
+	//DRP
+	output saddr, 
+	output sen,
+	output par_wr_en,
+	output [7:0] clkfbout_mult,
+	output [7:0]divclk_divide,
+	output [7:0] clkout_divide
+	
 );
 	 
 	 //DFI constants
@@ -244,7 +253,15 @@ module softMC #(parameter TCQ = 100, tCK = 2500, nCK_PER_CLK = 2, RANK_WIDTH = 1
 	 .aref_set_interval(aref_set_interval),
 	 .aref_interval(aref_interval_in),
 	 .aref_set_trfc(aref_set_trfc),
-	 .aref_trfc(aref_trfc_in)
+	 .aref_trfc(aref_trfc_in),
+	 
+	 //DRP
+	 .saddr(saddr), 
+	 .sen(sen), 
+	 .par_wr_en(par_wr_en), 
+	 .clkfbout_mult(clkfbout_mult), 
+	 .divclk_divide(divclk_divide), 
+	 .clkout_divide(clkout_divide)
     );
 	
 	
