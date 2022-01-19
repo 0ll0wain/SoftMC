@@ -326,7 +326,7 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 					end //SET_TRFC
 					
 					`PROGRAM_CLK: begin
-						if (instr0[27])begin //use default, if bit 27 is set
+						if (instr1[27])begin //use default, if bit 27 is set
 							   SADDR_ns = 1'b0;			//0 = Default State1, 1 = Programmable
 								SEN_ns = 1'b1;
 						end
@@ -334,9 +334,9 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 							SADDR_ns = 1'b1;			//0 = Default State1, 1 = Programmable
 							SEN_ns = 1'b1;
 							PARAMETER_WRITE_ENABLE_ns = 1'b1;
-							CLKFBOUT_MULT_ns = instr0[7:0];
-							DIVCLK_DIVIDE_ns = instr0[15:8];
-							CLKOUT_DIVIDE_ns = instr0[23:16];
+							CLKFBOUT_MULT_ns = instr1[7:0];
+							DIVCLK_DIVIDE_ns = instr1[15:8];
+							CLKOUT_DIVIDE_ns = instr1[23:16];
 						end
 					end 
 					

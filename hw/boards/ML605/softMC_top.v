@@ -163,9 +163,9 @@ module softMC_top #
 	 wire saddr; 
 	 wire sen; 
 	 wire par_wr_en; 
-	 wire clkfbout_mult;
-	 wire divclk_divide;
-	 wire clkout_divide;
+	 wire [7:0] clkfbout_mult;
+	 wire [7:0] divclk_divide;
+	 wire [7:0] clkout_divide;
 	
 	 
 	 //use 200MHZ refrence clock to generate mmcm_clk

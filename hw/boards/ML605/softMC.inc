@@ -1,5 +1,5 @@
 //uncomment the line below to run a simulation using "tb_softMC_top"
-//`define SIM
+`define SIM
 
 `define tCK 2500
 
@@ -10,7 +10,7 @@
 `define SET_TREFI 4'b0010
 `define SET_TRFC 4'b0011
 `define WAIT 4'b0100
-
+`define PROGRAM_CLK 4'b0101
 
 
 `define ROW_OFFSET 16

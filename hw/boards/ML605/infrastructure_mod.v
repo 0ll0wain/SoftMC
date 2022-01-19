@@ -188,6 +188,7 @@ module infrastructure_mod #
                              /* synthesis syn_maxfan = 10 */;
   wire                       rst_tmp;
   wire                       sys_rst_act_hi;
+  wire							  RST_MMCM;
 
   assign sys_rst_act_hi = RST_ACT_LOW ? ~sys_rst: sys_rst;
 
@@ -295,7 +296,7 @@ module infrastructure_mod #
        .PSEN         (PSEN),
        .PSINCDEC     (PSINCDEC),
        .PWRDWN       (1'b0),
-       .RST          (sys_rst_act_hi)
+       .RST          (RST_MMCM)
        );
 
   BUFG u_bufg_clk0
@@ -350,7 +351,7 @@ module infrastructure_mod #
 		// Top port connections
       .SADDR(saddr),
       .SEN(sen),
-      .RST(RST),
+      .RST(sys_rst),
       .SRDY(SRDY),
 		
 	// Reconfig Parameters
@@ -365,13 +366,13 @@ module infrastructure_mod #
       // Direct connections to the MMCM_ADV
       .DO(dout),
       .DRDY(drdy),
-      .LOCKED(locked),
+      .LOCKED(pll_lock),
       .DWE(dwe),
       .DEN(den),
       .DADDR(daddr),
       .DI(di),
       .DCLK(dclk),
-      .RST_MMCM()
+      .RST_MMCM(RST_MMCM)
     );
 
 

@@ -66,7 +66,7 @@ module iseq_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 1
 	output sen,
 	output par_wr_en,
 	output [7:0] clkfbout_mult,
-	output [7:0]divclk_divide,
+	output [7:0] divclk_divide,
 	output [7:0] clkout_divide
 );
 

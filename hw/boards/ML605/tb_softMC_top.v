@@ -811,108 +811,37 @@ module tb_softMC_top;
   begin : Logging
 		app_en = 0;
 		rdback_fifo_rden = 0;
-        begin : calibration_done
-           wait (phy_init_done);
-           $display("Calibration Done");
+         begin : calibration_done
+            wait (phy_init_done);
+            $display("Calibration Done");
 			  
-           #1000000;
-			  
+            #(APP_CLK_PERIOD*1000);
 			  
 	  app_en = 0;
-	  #(APP_CLK_PERIOD*1000);
 	  
-	  #APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b00010000000000000000000000000010; //busdir
 
-		#APP_CLK_PERIOD;
+	#(APP_CLK_PERIOD*100);
 		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101; //wait
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10010001000100110000000000000000; //act
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000110; //wait
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10010001000110110000000010110010; //read
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101; //wait
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10101101001000111000000000001110;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000110;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b11010011001000110100000000001000;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000001010;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10010001000100110000000000000000;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b00010000000000000000000000000000;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10010001000110110000000010110010;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10000001001010110000000000001000;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000001010;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000011;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b10010001000100110000000000000000;
-
-		#APP_CLK_PERIOD;
-		app_en = 1;
-		app_instr = 32'b01000000000000000000000000000101;
-
-		#APP_CLK_PERIOD;
+		app_instr = 32'b01010000000000100000000100000100;
+	#APP_CLK_PERIOD;
 		app_en = 1;
 		app_instr = 32'b00000000000000000000000000000000;
-
-		#APP_CLK_PERIOD;
+	#(APP_CLK_PERIOD*10);
 		app_en = 0;
-        end
+
+	#(APP_CLK_PERIOD*400);
+
+		app_en = 1;
+		app_instr = 32'b01011000000000000000000000000000;
+	#APP_CLK_PERIOD;
+		app_en = 1;
+		app_instr = 32'b00000000000000000000000000000000;
+	#APP_CLK_PERIOD;
+		app_en = 0;
+        
+		#(APP_CLK_PERIOD*400);
+		$stop;  
+  end
   end
       
 endmodule
-
