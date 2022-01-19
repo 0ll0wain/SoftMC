@@ -1,5 +1,20 @@
+hw/boards/ML605/ipcore_dir/
+.vscode/
 
-hw/boards/ML605/ipcore_dir/_xmsgs/pn_parser.xmsgs
+hw/boards/ML605/isim/
 hw/boards/ML605/softMC_top_summary.html
-hw/boards/ML605/iseconfig/softMC_top.xreport
+hw/boards/ML605/iseconfig/
 hw/boards/ML605/_xmsgs/pn_parser.xmsgs
+
+hw/boards/ML605/SoftMC.gise
+hw/boards/ML605/fuse.xmsgs
+hw/boards/ML605/tb_softMC_top_beh.prj
+hw/boards/ML605/xilinxsim.ini
+hw/boards/ML605/fuseRelaunch.cmd
+hw/boards/ML605/fuse.log
+hw/boards/ML605/softMC.inc
+
+hw/boards/ML605/tb_softMC_top_isim_beh.wdb
+hw/boards/ML605/tb_softMC_top_isim_beh.exe
+hw/boards/ML605/isim.log
+hw/boards/ML605/isim.cmd

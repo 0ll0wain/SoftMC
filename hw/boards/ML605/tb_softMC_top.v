@@ -811,15 +811,15 @@ module tb_softMC_top;
   begin : Logging
 		app_en = 0;
 		rdback_fifo_rden = 0;
-         begin : calibration_done
-            wait (phy_init_done);
-            $display("Calibration Done");
+         //begin : calibration_done
+            //wait (phy_init_done);
+            //$display("Calibration Done");
 			  
-            #(APP_CLK_PERIOD*1000);
+            //#(APP_CLK_PERIOD*1000);
 			  
 	  app_en = 0;
 	  
-
+	//Program with doubled default PLL Paramters 
 	#(APP_CLK_PERIOD*100);
 		app_en = 1;
 		app_instr = 32'b01010000000000100000000100000100;
@@ -828,9 +828,40 @@ module tb_softMC_top;
 		app_instr = 32'b00000000000000000000000000000000;
 	#(APP_CLK_PERIOD*10);
 		app_en = 0;
+		
+	//Program with PLL Paramters:
+	//parameter CLKFBOUT_MULT_F    = 3,     
+	//parameter DIVCLK_DIVIDE      = 1,     
+	//parameter CLKOUT_DIVIDE      = 2,     
 
+	
 	#(APP_CLK_PERIOD*400);
+		app_en = 1;
+		app_instr = 32'b01010000000000100000000100000011;
+	#APP_CLK_PERIOD;
+		app_en = 1;
+		app_instr = 32'b00000000000000000000000000000000;
+	#APP_CLK_PERIOD;
+		app_en = 0;
+		
+		
+	//Program with PLL Paramters:
+	//parameter CLKFBOUT_MULT_F    = 11,     
+	//parameter DIVCLK_DIVIDE      = 2,     
+	//parameter CLKOUT_DIVIDE      = 2,     
 
+	
+	#(APP_CLK_PERIOD*400);
+		app_en = 1;
+		app_instr = 32'b01010000000000100000000100001011;
+	#APP_CLK_PERIOD;
+		app_en = 1;
+		app_instr = 32'b00000000000000000000000000000000;
+	#APP_CLK_PERIOD;
+		app_en = 0;
+		
+	//Programm to default
+	#(APP_CLK_PERIOD*400);
 		app_en = 1;
 		app_instr = 32'b01011000000000000000000000000000;
 	#APP_CLK_PERIOD;
@@ -841,7 +872,7 @@ module tb_softMC_top;
         
 		#(APP_CLK_PERIOD*400);
 		$stop;  
-  end
+			//end
   end
       
 endmodule
