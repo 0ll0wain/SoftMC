@@ -104,10 +104,12 @@ function [13:0] mmcm_divider
 
    begin
       // Duty Cycle must be between 0 and 1,000
+		`ifdef DEBUG
       if(duty_cycle <=0 || duty_cycle >= 100000) begin
          $display("ERROR: duty_cycle: %d is invalid", duty_cycle);
          $finish;
       end
+		`endif
 
       // Convert to FIXED_WIDTH-FRAC_PRECISION.FRAC_PRECISION fixed point
       duty_cycle_fix = (duty_cycle << `FRAC_PRECISION) / 100_000;
@@ -137,9 +139,7 @@ function [13:0] mmcm_divider
          if(high_time == 7'h00) begin
             high_time   = 7'h01;
             w_edge      = 1'b0;
-         end
-
-         if(high_time == divide) begin
+         end else if(high_time == divide) begin
             high_time   = divide - 1;
             w_edge      = 1'b1;
          end
@@ -182,12 +182,13 @@ function [10:0] mmcm_phase
 `ifdef DEBUG
       $display("mmcm_phase-divide:%d,phase:%d",
          divide, phase);
-`endif
+
    
       if ((phase < -360000) || (phase > 360000)) begin
          $display("ERROR: phase of $phase is not between -360000 and 360000");
          $finish;
       end
+`endif
 
       // If phase is less than 0, convert it to a positive phase shift
       // Convert to (FIXED_WIDTH-FRAC_PRECISION).FRAC_PRECISION fixed point

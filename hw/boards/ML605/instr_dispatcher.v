@@ -380,7 +380,7 @@ module instr_dispatcher #(parameter ROW_WIDTH = 15, BANK_WIDTH = 3, CKE_WIDTH = 
 			SADDR <= 0;
 			SEN <= 0;
 			PARAMETER_WRITE_ENABLE <= 0;
-			CLKFBOUT_MULT <= 2;
+			CLKFBOUT_MULT <= 6;
 			DIVCLK_DIVIDE <= 1;
 			CLKOUT_DIVIDE <= 2;
 		end

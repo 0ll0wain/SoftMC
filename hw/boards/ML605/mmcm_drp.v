@@ -88,7 +88,7 @@ module mmcm_drp
       parameter S1_CLKOUT1_PHASE          = 0,
       parameter S1_CLKOUT1_DUTY           = 50000,
       
-      parameter S1_CLKOUT2_DIVIDE         = 2,
+      parameter S1_CLKOUT2_DIVIDE         = 1,
       parameter S1_CLKOUT2_PHASE          = 0,
       parameter S1_CLKOUT2_DUTY           = 50000,
       
@@ -185,12 +185,18 @@ module mmcm_drp
    reg         next_rst_mmcm;
    reg [15:0]  next_di;
 	
+	reg 			next_PAR_CLEAR_EN;
+	reg 			PAR_CLEAR_EN;
+	
 	//Registers to save PLL configuration
 	reg 	[7:0]	S2_CLKFBOUT_MULT;
 	reg	[7:0]	S2_DIVCLK_DIVIDE;
 	reg	[7:0]	S2_CLKOUT0_DIVIDE;
 	reg	[7:0]	S2_CLKOUT1_DIVIDE;
 	reg	[7:0]	S2_CLKOUT2_DIVIDE;
+	
+	reg SEN_r;
+	reg SADDR_r;
    
    // Integer used to initialize remainder of unused ROM
    integer     ii;
@@ -349,9 +355,13 @@ module mmcm_drp
       // Store CLKOUT6 divide and phase
       rom[36] = {7'h12, 16'h1000, S2_CLKOUT6[15:0]};
       rom[37] = {7'h13, 16'hFC00, S2_CLKOUT6[31:16]};
-      
+		
+      for(ii = 24; ii < 30; ii = ii +1) begin
+         rom[ii] = 0;
+      end
+		
       // Initialize the rest of the ROM
-      for(ii = 46; ii < 64; ii = ii +1) begin
+      for(ii = 38; ii < 64; ii = ii +1) begin
          rom[ii] = 0;
       end
    end
@@ -363,15 +373,27 @@ module mmcm_drp
 	
 	
 	// Save Configuration Parameters in Registers
-	always @(posedge SCLK) begin
-      if(PAR_WR_EN) begin
+	always @(posedge PAR_WR_EN or posedge PAR_CLEAR_EN) begin
+		if (PAR_CLEAR_EN) begin
+			SEN_r <= #TCQ 1'b0;
+			SADDR_r <= #TCQ 1'b0;
+         S2_CLKFBOUT_MULT <= #TCQ 8'b0;
+			S2_DIVCLK_DIVIDE <= #TCQ 8'b0;
+			S2_CLKOUT0_DIVIDE <= #TCQ 8'b0;
+			S2_CLKOUT1_DIVIDE <= #TCQ 8'b0;
+			S2_CLKOUT2_DIVIDE <= #TCQ 8'b0;
+		end else begin			
+			SEN_r <= #TCQ SEN;
+			SADDR_r <= #TCQ SADDR;
          S2_CLKFBOUT_MULT <= #TCQ CLKFBOUT_MULT;
 			S2_DIVCLK_DIVIDE <= #TCQ DIVCLK_DIVIDE;
-			S2_CLKOUT0_DIVIDE <= #TCQ DIVCLK_DIVIDE ;
-			S2_CLKOUT1_DIVIDE <= #TCQ DIVCLK_DIVIDE* 2;
-			S2_CLKOUT2_DIVIDE <= #TCQ DIVCLK_DIVIDE* 2;
-      end
+			S2_CLKOUT0_DIVIDE <= #TCQ CLKOUT_DIVIDE ;
+			S2_CLKOUT1_DIVIDE <= #TCQ CLKOUT_DIVIDE* 2;
+			S2_CLKOUT2_DIVIDE <= #TCQ CLKOUT_DIVIDE;
+
+		end
    end
+
    
    //**************************************************************************
    // Everything below is associated whith the state machine that is used to
@@ -383,12 +405,13 @@ module mmcm_drp
    localparam WAIT_LOCK    = 4'd2;
    localparam WAIT_SEN     = 4'd3;
 	localparam BIT_CALC     = 4'd4;
-   localparam ADDRESS      = 4'd5;
-   localparam WAIT_A_DRDY  = 4'd6;
-   localparam BITMASK      = 4'd7;
-   localparam BITSET       = 4'd8;
-   localparam WRITE        = 4'd9;
-   localparam WAIT_DRDY    = 4'd10;
+	localparam BIT_STORE    = 4'd5;
+   localparam ADDRESS      = 4'd6;
+   localparam WAIT_A_DRDY  = 4'd7;
+   localparam BITMASK      = 4'd8;
+   localparam BITSET       = 4'd9;
+   localparam WRITE        = 4'd10;
+   localparam WAIT_DRDY    = 4'd11;
    
    // State sync
    reg [3:0]  current_state   = RESTART;
@@ -414,6 +437,7 @@ module mmcm_drp
       
       rom_addr    <= #TCQ next_rom_addr;
       state_count <= #TCQ next_state_count;
+		PAR_CLEAR_EN<= #TCQ next_PAR_CLEAR_EN;
    end
    
    // This block assigns the next state, reset is syncronous.
@@ -435,6 +459,7 @@ module mmcm_drp
       next_di           = DI;
       next_rom_addr     = rom_addr;
       next_state_count  = state_count;
+		next_PAR_CLEAR_EN = 1'b0;
    
       case (current_state)
          // If RST is asserted reset the machine
@@ -470,10 +495,10 @@ module mmcm_drp
          //    based on SADDR
          WAIT_SEN: begin
 
-            if (SEN) begin
+            if (SEN_r) begin
                // SEN was asserted
                
-					if (!SADDR) begin
+					if (!SADDR_r) begin
 						next_state = ADDRESS;
 						// Go on to address the MMCM
 						next_rom_addr = 8'h00;
@@ -496,6 +521,8 @@ module mmcm_drp
 			// Calculate values for second state
 			BIT_CALC: begin
 			
+				
+			
 				S2_CLKFBOUT     	= mmcm_count_calc(S2_CLKFBOUT_MULT, S2_CLKFBOUT_PHASE, 50000);
 					
 				S2_DIGITAL_FILT  	= mmcm_filter_lookup(S2_CLKFBOUT_MULT, S2_BANDWIDTH);
@@ -509,7 +536,11 @@ module mmcm_drp
 				S2_CLKOUT1      	= mmcm_count_calc(S2_CLKOUT1_DIVIDE, S2_CLKOUT1_PHASE, S2_CLKOUT1_DUTY);
 						
 				S2_CLKOUT2      	= mmcm_count_calc(S2_CLKOUT2_DIVIDE, S2_CLKOUT2_PHASE, S2_CLKOUT2_DUTY);
-					
+				
+				next_state = BIT_STORE;
+			end
+			
+			BIT_STORE: begin
 				// Store CLKOUT0 divide and phase
 				rom[24] = {7'h08, 16'h1000, S2_CLKOUT0[15:0]};
 				rom[25] = {7'h09, 16'hFC00, S2_CLKOUT0[31:16]};
@@ -541,7 +572,9 @@ module mmcm_drp
 				rom[45] = {7'h4F, 16'h666F, 
 					S2_DIGITAL_FILT[5], 2'h0, S2_DIGITAL_FILT[4:3], 2'h0,
 					S2_DIGITAL_FILT[2:1], 2'h0, S2_DIGITAL_FILT[0], 4'h0 };
-				
+					
+					//Reset Parameter Registers
+				next_PAR_CLEAR_EN = 1'b1;
 				next_state = ADDRESS;
 				
 			end

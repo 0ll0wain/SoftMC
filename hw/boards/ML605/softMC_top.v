@@ -197,7 +197,7 @@ module softMC_top #
      .CLKOUT_DIVIDE      (CLKOUT_DIVIDE),
      .RST_ACT_LOW        (RST_ACT_LOW)
      )
-    infrastructure_inst
+    u_infrastructure
       ( 	 
        .clk_mem          (clk_mem), //output
        .clk              (clk), //output

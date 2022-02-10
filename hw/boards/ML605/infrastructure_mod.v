@@ -84,9 +84,9 @@ module infrastructure_mod #
    parameter INPUT_CLK_TYPE     = "DIFFERENTIAL", // input clock type
                                          // "DIFFERENTIAL","SINGLE_ENDED"
    parameter MMCM_ADV_BANDWIDTH = "OPTIMIZED", // MMCM programming algorithm
-   parameter CLKFBOUT_MULT_F    = 2,     // write PLL VCO multiplier
+   parameter CLKFBOUT_MULT_F    = 6,     // write PLL VCO multiplier
    parameter DIVCLK_DIVIDE      = 1,     // write PLL VCO divisor
-   parameter CLKOUT_DIVIDE      = 2,     // VCO output divisor for fast
+   parameter CLKOUT_DIVIDE      = 3,     // VCO output divisor for fast
                                          // (memory) clocks
    parameter RST_ACT_LOW        = 1
    )
@@ -182,6 +182,8 @@ module infrastructure_mod #
   wire                       clk_mem_pll;
   wire                       clk_pll;
   wire                       clkfbout_pll;
+  wire 							  clk_rd_base_pll;
+  wire							  clk_rd_base_bufg;
   wire                       pll_lock
                              /* synthesis syn_maxfan = 10 */;
   reg [RST_DIV_SYNC_NUM-1:0] rstdiv0_sync_r
@@ -200,6 +202,7 @@ module infrastructure_mod #
 
   assign clk_mem = clk_mem_bufg;
   assign clk     = clk_bufg;
+  //assign clk_rd_base_bufg = clk_rd_base_bufg;
 
   //***************************************************************************
   // Global base clock generation and distribution
@@ -310,7 +313,13 @@ module infrastructure_mod #
      .O (clk_bufg),
      .I (clk_pll)
      );
-
+	  /*
+  BUFG u_bufg_clkdiv1
+    (
+     .O (clk_rd_base_bufg),
+     .I (clk_rd_base_pll)
+     );
+*/
   //***************************************************************************
   // RESET SYNCHRONIZATION DESCRIPTION:
   //  Various resets are generated to ensure that:
@@ -360,7 +369,7 @@ module infrastructure_mod #
 	.DIVCLK_DIVIDE(divclk_divide), 
 	.CLKOUT_DIVIDE(clkout_divide), 
       
-      // Systemclk
+      // FabricClk
       .SCLK(mmcm_clk),
       
       // Direct connections to the MMCM_ADV
