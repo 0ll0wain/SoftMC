@@ -63,7 +63,9 @@ module softMC #(parameter TCQ = 100, tCK = 2500, nCK_PER_CLK = 2, RANK_WIDTH = 1
 	output par_wr_en,
 	output [7:0] clkfbout_mult,
 	output [7:0]divclk_divide,
-	output [7:0] clkout_divide
+	output [7:0] clkout_divide,
+	input rdback_fifo_wren_drp,
+	input [4*DQ_WIDTH-1:0] rdback_fifo_wrdata_drp
 	
 );
 	 
@@ -268,9 +270,22 @@ module softMC #(parameter TCQ = 100, tCK = 2500, nCK_PER_CLK = 2, RANK_WIDTH = 1
 	assign iq_full = instr0_fifo_full | instr1_fifo_full;
 	assign processing_iseq = dispatcher_busy;
 	
-	wire[DQ_WIDTH*4 - 1: 0] rdback_fifo_wrdata, rdback_fifo_out;
+	wire[DQ_WIDTH*4 - 1: 0] rdback_fifo_wrdata_rc; 
+	wire[DQ_WIDTH*4 - 1: 0] rdback_fifo_wrdata; 
+	wire rdback_fifo_out;
 	wire rdback_fifo_full, rdback_fifo_almost_full;
-	wire rdback_fifo_wren;
+	wire rdback_fifo_wren_rc, rdback_fifo_wren;
+	
+	reg [DQ_WIDTH*4 - 1: 0] rdback_fifo_wrdata_drp_r;
+	reg rdback_fifo_wren_drp_r;
+	
+	always @(posedge rdback_fifo_wren_drp) begin
+		rdback_fifo_wrdata_drp_r <= rdback_fifo_wrdata_drp;
+		rdback_fifo_wren_drp_r <= rdback_fifo_wren_drp;
+	end
+	
+	assign rdback_fifo_wrdata = rdback_fifo_wren_rc ? rdback_fifo_wrdata_rc : rdback_fifo_wrdata_drp;
+	assign rdback_fifo_wren = rdback_fifo_wren_rc | rdback_fifo_wren_drp;
 	
 	rdback_fifo i_rdback_fifo (
 	  .clk(clk), // input clk
@@ -300,8 +315,8 @@ module softMC #(parameter TCQ = 100, tCK = 2500, nCK_PER_CLK = 2, RANK_WIDTH = 1
 	//FIFO interface
 	.rdback_fifo_full(rdback_fifo_full),
 	.rdback_fifo_almost_full(rdback_fifo_almost_full),
-	.rdback_fifo_wren(rdback_fifo_wren),
-	.rdback_fifo_wrdata(rdback_fifo_wrdata)
+	.rdback_fifo_wren(rdback_fifo_wren_rc),
+	.rdback_fifo_wrdata(rdback_fifo_wrdata_rc)
 );
 
 	assign dfi_dram_clk_disable = read_capturer_dfi_clk_disable;

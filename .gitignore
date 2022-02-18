@@ -100,3 +100,6 @@ hw/boards/ML605/planAhead_run_1/
 
 hw/boards/ML605/softMC_top_2022-2-4-18-29-58.twx
 hw/boards/ML605/softMC_top_2022-2-3-11-43-4.twx
+hw/boards/ML605/mmcm_drp.cmd_log
+hw/boards/ML605/mmcm_drp.tfi
+hw/boards/ML605/softMC_top_2022-2-17-13-30-47.twx

@@ -37,6 +37,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 `timescale 1ps/1ps
+`include "softMC.inc"
 
 module mmcm_drp
    #(
@@ -137,7 +138,10 @@ module mmcm_drp
       
       parameter S2_CLKOUT6_DIVIDE         = 1,
       parameter S2_CLKOUT6_PHASE          = 0,
-      parameter S2_CLKOUT6_DUTY           = 50000
+      parameter S2_CLKOUT6_DUTY           = 50000,
+		
+		parameter DQ_WIDTH              = 64
+                                    // # of Data (DQ) bits.
       
    ) (
 	
@@ -164,7 +168,12 @@ module mmcm_drp
       output reg [6:0]  DADDR,
       output reg [15:0] DI,
       output            DCLK,
-      output reg        RST_MMCM
+      output reg        RST_MMCM,
+		
+		//Output when finished
+		output reg rdback_fifo_wren,
+		output reg [4*DQ_WIDTH-1:0] rdback_fifo_wrdata,
+		input rstdiv0
    );
 
    // 100 ps delay for behavioral simulations
@@ -187,6 +196,11 @@ module mmcm_drp
 	
 	reg 			next_PAR_CLEAR_EN;
 	reg 			PAR_CLEAR_EN;
+	
+	reg			rstready;
+	
+	reg			next_rdback_fifo_wren;
+	reg [4*DQ_WIDTH-1:0]next_rdback_fifo_wrdata;
 	
 	//Registers to save PLL configuration
 	reg 	[7:0]	S2_CLKFBOUT_MULT;
@@ -368,9 +382,18 @@ module mmcm_drp
 
    // Output the initialized rom value based on rom_addr each clock cycle
    always @(posedge SCLK) begin
-      rom_do<= #TCQ rom[rom_addr];
+      rom_do <= #TCQ rom[rom_addr];
    end
 	
+	reg rstready_reset;
+	wire not_rstdiv0 = ~rstdiv0;
+	
+	 always @(posedge not_rstdiv0 or posedge rstready_reset) begin
+		if (not_rstdiv0)
+			rstready <= #TCQ 1'b1;
+		else
+			rstready <= #TCQ 1'b0;
+   end
 	
 	// Save Configuration Parameters in Registers
 	always @(posedge PAR_WR_EN or posedge PAR_CLEAR_EN) begin
@@ -412,6 +435,7 @@ module mmcm_drp
    localparam BITSET       = 4'd9;
    localparam WRITE        = 4'd10;
    localparam WAIT_DRDY    = 4'd11;
+	localparam WAIT_RDBACK  = 4'd12;
    
    // State sync
    reg [3:0]  current_state   = RESTART;
@@ -438,6 +462,11 @@ module mmcm_drp
       rom_addr    <= #TCQ next_rom_addr;
       state_count <= #TCQ next_state_count;
 		PAR_CLEAR_EN<= #TCQ next_PAR_CLEAR_EN;
+		
+		rdback_fifo_wren <= #TCQ next_rdback_fifo_wren;
+		rdback_fifo_wrdata <= #TCQ next_rdback_fifo_wrdata;
+		
+		
    end
    
    // This block assigns the next state, reset is syncronous.
@@ -460,6 +489,9 @@ module mmcm_drp
       next_rom_addr     = rom_addr;
       next_state_count  = state_count;
 		next_PAR_CLEAR_EN = 1'b0;
+		next_rdback_fifo_wrdata = 0;
+		next_rdback_fifo_wren = 1'b0;
+
    
       case (current_state)
          // If RST is asserted reset the machine
@@ -481,15 +513,34 @@ module mmcm_drp
             
             if(LOCKED) begin
                // MMCM is locked, go on to wait for the SEN signal
-               next_state  = WAIT_SEN;
+               next_state  = WAIT_RDBACK;
                // Assert SRDY to indicate that the reconfiguration module is
                // ready
                next_srdy   = 1'b1;
+					
             end else begin
                // Keep waiting, locked has not asserted yet
                next_state  = WAIT_LOCK;
             end
          end
+			
+			WAIT_RDBACK: begin
+			
+				if(rstready)begin
+					//Reset Parameter Registers
+					next_PAR_CLEAR_EN = 1'b1;
+					//Readback
+					next_rdback_fifo_wren = 1'b1;
+					next_rdback_fifo_wrdata[7:0] = S2_CLKFBOUT_MULT;
+					next_rdback_fifo_wrdata[15:8] = S2_DIVCLK_DIVIDE;
+					next_rdback_fifo_wrdata[23:16] = S2_CLKOUT0_DIVIDE;
+						
+					next_state = WAIT_SEN;	
+					rstready_reset = 1'b0;
+				end else begin		
+					next_state = WAIT_RDBACK;
+				end
+			end
          
          // Wait for the next SEN pulse and set the ROM addr appropriately 
          //    based on SADDR
@@ -573,8 +624,6 @@ module mmcm_drp
 					S2_DIGITAL_FILT[5], 2'h0, S2_DIGITAL_FILT[4:3], 2'h0,
 					S2_DIGITAL_FILT[2:1], 2'h0, S2_DIGITAL_FILT[0], 4'h0 };
 					
-					//Reset Parameter Registers
-				next_PAR_CLEAR_EN = 1'b1;
 				next_state = ADDRESS;
 				
 			end

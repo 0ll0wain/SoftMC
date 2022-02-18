@@ -88,7 +88,9 @@ module infrastructure_mod #
    parameter DIVCLK_DIVIDE      = 1,     // write PLL VCO divisor
    parameter CLKOUT_DIVIDE      = 3,     // VCO output divisor for fast
                                          // (memory) clocks
-   parameter RST_ACT_LOW        = 1
+   parameter RST_ACT_LOW        = 1,
+	parameter DQ_WIDTH              = 64
+                                    // # of Data (DQ) bits.
    )
   (
    // Clock inputs
@@ -114,7 +116,10 @@ module infrastructure_mod #
 	input 	 par_wr_en, 
 	input [7:0] clkfbout_mult, 
 	input [7:0] divclk_divide, 
-	input [7:0] clkout_divide
+	input [7:0] clkout_divide,
+	
+	output rdback_fifo_wren,
+	output[4*DQ_WIDTH-1:0] rdback_fifo_wrdata
    );
 
   // # of clock cycles to delay deassertion of reset. Needs to be a fairly
@@ -356,7 +361,10 @@ module infrastructure_mod #
   assign rstdiv0 = rstdiv0_sync_r[RST_DIV_SYNC_NUM-1];
   
 
-  mmcm_drp drp_instance (
+  mmcm_drp #(
+  .DQ_WIDTH(DQ_WIDTH)
+  ) drp_instance
+  (
 		// Top port connections
       .SADDR(saddr),
       .SEN(sen),
@@ -381,7 +389,12 @@ module infrastructure_mod #
       .DADDR(daddr),
       .DI(di),
       .DCLK(dclk),
-      .RST_MMCM(RST_MMCM)
+      .RST_MMCM(RST_MMCM),
+		.rdback_fifo_wren(rdback_fifo_wren), 
+      .rdback_fifo_wrdata(rdback_fifo_wrdata),
+		
+		//RST signal to now when rst is deasserted
+		.rstdiv0(rstdiv0)
     );
 
 

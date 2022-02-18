@@ -812,11 +812,11 @@ module tb_softMC_top;
   begin : Logging
 		app_en = 0;
 		rdback_fifo_rden = 0;
-         begin : calibration_done
-            wait (phy_init_done);
-            $display("Calibration Done");
+         //begin : calibration_done
+            //wait (phy_init_done);
+            //$display("Calibration Done");
 			  
-            #(APP_CLK_PERIOD*1000);
+            //#(APP_CLK_PERIOD*1000);
 			  
 	  app_en = 0;
 	  
@@ -1072,9 +1072,13 @@ module tb_softMC_top;
 	#APP_CLK_PERIOD;
 		app_en = 0;
       */
+		rdback_fifo_rden = 1;
+		#(APP_CLK_PERIOD*10);
+		rdback_fifo_rden = 0;
+		
 		#(APP_CLK_PERIOD*400);
 		$stop;  
-			end
+			//end
   end
       
 endmodule

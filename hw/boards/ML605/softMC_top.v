@@ -166,6 +166,8 @@ module softMC_top #
 	 wire [7:0] clkfbout_mult;
 	 wire [7:0] divclk_divide;
 	 wire [7:0] clkout_divide;
+	 wire rdback_fifo_wren;
+	 wire [4*DQ_WIDTH-1:0] rdback_fifo_wrdata;
 	
 	 
 	 //use 200MHZ refrence clock to generate mmcm_clk
@@ -195,7 +197,8 @@ module softMC_top #
      .CLKFBOUT_MULT_F    (CLKFBOUT_MULT_F),
      .DIVCLK_DIVIDE      (DIVCLK_DIVIDE),
      .CLKOUT_DIVIDE      (CLKOUT_DIVIDE),
-     .RST_ACT_LOW        (RST_ACT_LOW)
+     .RST_ACT_LOW        (RST_ACT_LOW),
+	  .DQ_WIDTH				 (DQ_WIDTH)
      )
     u_infrastructure
       ( 	 
@@ -217,7 +220,9 @@ module softMC_top #
 		 .par_wr_en(par_wr_en), 
 		 .clkfbout_mult(clkfbout_mult), 
 		 .divclk_divide(divclk_divide), 
-		 .clkout_divide(clkout_divide)
+		 .clkout_divide(clkout_divide),
+		 .rdback_fifo_wren(rdback_fifo_wren), 
+		 .rdback_fifo_wrdata(rdback_fifo_wrdata)
        );
 		 
 		 
@@ -459,7 +464,9 @@ module softMC_top #
 	 .par_wr_en(par_wr_en), 
 	 .clkfbout_mult(clkfbout_mult), 
 	 .divclk_divide(divclk_divide), 
-	 .clkout_divide(clkout_divide)
+	 .clkout_divide(clkout_divide),
+	 .rdback_fifo_wren_drp(rdback_fifo_wren), 
+    .rdback_fifo_wrdata_drp(rdback_fifo_wrdata)
 );
 
 `ifndef SIM
