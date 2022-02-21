@@ -104,7 +104,7 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
   // Receive the data
   uint rbuf[16];
   for (int i = 0; i < NUM_COLS;
-       i += 8) { // we receive a single burst at two times (32 bytes each)
+       i += 8) { // we receive a single burst at two times (32 bytes)
     fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
 
     // compare with the pattern
@@ -112,8 +112,9 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
 
     for (int j = 0; j < 64; j++) {
       if (rbuf8[j] != pattern)
-        fprintf(stderr, "Error at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i,
-                row, bank, rbuf8[j]);
+        printf("Error at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i + j, row,
+               bank, rbuf8[j]);
+      printf("i: %d, j: %d\n", i, j);
     }
   }
 }
@@ -227,6 +228,21 @@ void testRetention(fpga_t *fpga, const int retention) {
   delete iseq;
 }
 
+void readWriteTest(fpga_t *fpga) {
+  uint8_t pattern = 0xff; // the data pattern that we write to the DRAM
+  InstructionSequence *iseq = nullptr;
+
+  // Switch the memory bus to write mode
+  turnBus(fpga, BUSDIR::WRITE, iseq);
+
+  writeRow(fpga, 0, 0, pattern, iseq);
+
+  // Switch the memory bus to read mode
+  turnBus(fpga, BUSDIR::READ, iseq);
+
+  readAndCompareRow(fpga, 0, 0, pattern, iseq);
+}
+
 // provide trefi = 0 to disable auto-refresh
 // auto-refresh is disabled by default (disabled after FPGA boots, disables on
 // pushing reset button)
@@ -244,6 +260,45 @@ void setRefreshConfig(fpga_t *fpga, uint trefi, uint trfc) {
   delete iseq;
 }
 
+// set CLK Speed with three parameters
+int setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
+                uint clkout_divide) {
+  InstructionSequence *iseq = new InstructionSequence;
+
+  // Tip: Only adjust first parameter -> clkfbout_mult * 100MHz = DDR_speed
+  //      with divclk_divide = 1, clkout_divide = 4
+  iseq->insert(genCLKSPEED_CONFIG(clkfbout_mult, divclk_divide, clkout_divide));
+
+  iseq->insert(genEND());
+
+  iseq->execute(fpga);
+
+  // Receive the data
+  uint rbuf[8];
+  int read_result = fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
+
+  printf("Read Result: %d", read_result);
+
+  if (read_result < 0) {
+    return -1;
+  }
+
+  // compare with the pattern
+  uint8_t *rbuf8 = (uint8_t *)rbuf;
+
+  uint8_t clkfbout_mult = rbuf[0];
+  uint8_t divclk_divide = rbuf[1];
+  uint8_t clkout_divide = rbuf[2];
+
+  uint8_t base_clk = 400;
+
+  int DDR_clk = (base_clk * clkfbout_mult) / (divclk_divide * clkout_divide);
+  int fabric_clk = DDR_clk / 2;
+
+  delete iseq;
+  return fabric_clk;
+}
+
 void printHelp(char *argv[]) {
   cout << "A sample application that tests retention time of DRAM cells using "
           "SoftMC"
@@ -258,27 +313,27 @@ int main(int argc, char *argv[]) {
   fpga_t *fpga;
   fpga_info_list info;
   int fid = 0; // fpga id
-  int ch = 0; // channel id
+  int ch = 0;  // channel id
 
-  if (argc != 2 || strcmp(argv[1], "--help") == 0) {
-    printHelp(argv);
-    return -2;
-  }
+  // if (argc != 2 || strcmp(argv[1], "--help") == 0) {
+  //   printHelp(argv);
+  //   return -2;
+  // }
 
-  string s_ref(argv[1]);
-  int refresh_interval = 0;
+  // string s_ref(argv[1]);
+  // int refresh_interval = 0;
 
-  try {
-    refresh_interval = stoi(s_ref);
-  } catch (...) {
-    printHelp(argv);
-    return -3;
-  }
+  // try {
+  //   refresh_interval = stoi(s_ref);
+  // } catch (...) {
+  //   printHelp(argv);
+  //   return -3;
+  // }
 
-  if (refresh_interval <= 0) {
-    printHelp(argv);
-    return -4;
-  }
+  // if (refresh_interval <= 0) {
+  //   printHelp(argv);
+  //   return -4;
+  // }
 
   // Get the list of FPGA's attached to the system
   if (fpga_list(&info) != 0) {
@@ -306,15 +361,33 @@ int main(int argc, char *argv[]) {
   // send a reset signal to the FPGA
   fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
 
-  // uint trefi = 7800/200; //7.8us (divide by 200ns as the HW counts with that
-  // period)
-  // uint trfc = 104; //default trfc for 4Gb device
-  // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
-  // setRefreshConfig(fpga, trefi, trfc);
+  uint trefi =
+      7800 / 200;  // 7.8us (divide by 200ns as the HW counts with that period)
+  uint trfc = 104; // default trfc for 4Gb device
+  printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
+  setRefreshConfig(fpga, trefi, trfc);
 
-  printf("Starting Retention Time Test @ %d ms! \n", refresh_interval);
+  // printf("Starting Retention Time Test @ %d ms! \n", refresh_interval);
 
-  testRetention(fpga, refresh_interval);
+  // testRetention(fpga, refresh_interval);
+
+  printf("Setting clock Speed to:\n");
+
+  // set speed to 900 MHz
+  // Tip: Only adjust first parameter -> clkfbout_mult * 100MHz = DDR_speed
+  //      with divclk_divide = 1, clkout_divide = 4
+
+  int new_clk_speed = setCLKspeed(fpga, 9, 1, 4);
+  if (new_clk_speed < 0) {
+    printf("Error: Something went wrong during Clk speed change");
+    return;
+  } else {
+    printf("%dMHz\nClk Change Successful!\n", new_clk_speed);
+  }
+
+  printf("Starting Basic Read/Write Test! \n");
+
+  readWriteTest(fpga);
 
   printf("The test has been completed! \n");
   fpga_close(fpga);
