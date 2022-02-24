@@ -853,7 +853,7 @@ module tb_softMC_top;
 	
 	#(APP_CLK_PERIOD*400);
 		app_en = 1;
-		app_instr = 32'b01010000000000100000000100001011;
+		app_instr = 32'b0101 0000  0000 0010  0000 0001  0000 1011;
 	#APP_CLK_PERIOD;
 		app_en = 1;
 		app_instr = 32'b00000000000000000000000000000000;

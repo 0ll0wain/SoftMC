@@ -54,7 +54,7 @@ module mmcm_drp
       //    _PHASE: This is the phase multiplied by 1000. For example if
       //          a phase of 24.567 deg was desired the input value would be
       //          24567.  The range for the phase is from -360000 to 360000. 
-      parameter S1_CLKFBOUT_MULT          = 2,
+      parameter S1_CLKFBOUT_MULT          = 6,
       parameter S1_CLKFBOUT_PHASE         = 0,
       
       // The bandwidth parameter effects the phase error and the jitter filter
@@ -80,15 +80,15 @@ module mmcm_drp
       //          a duty cycle of .24567 was desired the input would be
       //          24567.
       
-      parameter S1_CLKOUT0_DIVIDE         = 1,
+      parameter S1_CLKOUT0_DIVIDE         = 3,
       parameter S1_CLKOUT0_PHASE          = 0,
       parameter S1_CLKOUT0_DUTY           = 50000,
       
-      parameter S1_CLKOUT1_DIVIDE         = 2,
+      parameter S1_CLKOUT1_DIVIDE         = 6,
       parameter S1_CLKOUT1_PHASE          = 0,
       parameter S1_CLKOUT1_DUTY           = 50000,
       
-      parameter S1_CLKOUT2_DIVIDE         = 2,
+      parameter S1_CLKOUT2_DIVIDE         = 3,
       parameter S1_CLKOUT2_PHASE          = 0,
       parameter S1_CLKOUT2_DUTY           = 50000,
       
@@ -108,7 +108,7 @@ module mmcm_drp
       parameter S1_CLKOUT6_PHASE          = 0,
       parameter S1_CLKOUT6_DUTY           = 50000,
 		
-		      //***********************************************************************
+		//***********************************************************************
       // State 2 Parameters - These are for the second reconfiguration state.
       //***********************************************************************
       parameter S2_CLKFBOUT_PHASE         = 0,
@@ -367,9 +367,9 @@ module mmcm_drp
       if(PAR_WR_EN) begin
          S2_CLKFBOUT_MULT <= #TCQ CLKFBOUT_MULT;
 			S2_DIVCLK_DIVIDE <= #TCQ DIVCLK_DIVIDE;
-			S2_CLKOUT0_DIVIDE <= #TCQ DIVCLK_DIVIDE ;
-			S2_CLKOUT1_DIVIDE <= #TCQ DIVCLK_DIVIDE* 2;
-			S2_CLKOUT2_DIVIDE <= #TCQ DIVCLK_DIVIDE* 2;
+			S2_CLKOUT0_DIVIDE <= #TCQ CLKOUT_DIVIDE ;
+			S2_CLKOUT1_DIVIDE <= #TCQ CLKOUT_DIVIDE* 2;
+			S2_CLKOUT2_DIVIDE <= #TCQ CLKOUT_DIVIDE;
       end
    end
    
