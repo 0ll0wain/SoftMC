@@ -289,7 +289,7 @@ void setRefreshConfig(fpga_t *fpga, uint trefi, uint trfc)
 }
 
 // set CLK Speed with three parameters
-int setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
+void setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
                  uint clkout_divide)
 {
   InstructionSequence *iseq = new InstructionSequence;
@@ -301,6 +301,11 @@ int setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
   iseq->insert(genEND());
 
   iseq->execute(fpga);
+
+  return;
+}
+
+int getCLKspeed(fpga_t *fpga){
 
   // Receive the data
   uint rbuf[8];
@@ -315,26 +320,26 @@ int setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
   // compare with the pattern
   uint8_t *rbuf8 = (uint8_t *)rbuf;
 
-  uint8_t clkfbout_mult = rbuf[0];
-  uint8_t divclk_divide = rbuf[1];
-  uint8_t clkout_divide = rbuf[2];
+  uint8_t clkfbout_mult_readback = rbuf[0];
+  uint8_t divclk_divide_readback = rbuf[1];
+  uint8_t clkout_divide_readback = rbuf[2];
 
-  uint8_t base_clk = 400;
+  int base_clk = 400;
 
-  int DDR_clk = (base_clk * clkfbout_mult) / (divclk_divide * clkout_divide);
+  int DDR_clk = (base_clk * clkfbout_mult_readback) / (divclk_divide_readback * clkout_divide_readback);
   int fabric_clk = DDR_clk / 2;
 
-  delete iseq;
   return fabric_clk;
 }
 
-void printHelp(char *argv[]) {
-  cout << "A sample application that tests retention time of DRAM cells using "
+void printHelp(char *argv[])
+{
+  cout << "A sample application that tests clk reprogramming of DRAM and MemoryController Clocks using "
           "SoftMC"
        << endl;
-  cout << "Usage:" << argv[0] << " [REFRESH INTERVAL]" << endl;
-  cout << "The Refresh Interval should be a positive integer, indicating the "
-          "target retention time in milliseconds."
+  cout << "Usage:" << argv[0] << " [MULTIPLIER]" << endl;
+  cout << "The Multiplier should be a positive integer > 5, indicating the "
+          "target frequency. Frequency = MULT * 100MHz"
        << endl;
 }
 
@@ -391,7 +396,7 @@ int main(int argc, char *argv[]) {
   printf("The FPGA has been opened successfully! \n");
 
   // send a reset signal to the FPGA
-  fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
+  //fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
 
   uint trefi =
       7800 / 200;  // 7.8us (divide by 200ns as the HW counts with that period)
@@ -403,18 +408,19 @@ int main(int argc, char *argv[]) {
 
   // testRetention(fpga, refresh_interval);
 
-  printf("Setting clock Speed to:\n");
+  printf("Setting clock Speed\n");
 
   // set speed to x MHz
   // Default is (6,1,3), corresponds to 800 Mhz DDR Clk and 400 MHz Fabric Clk
   // Tip: Only adjust first parameter -> clkfbout_mult * 100MHz = DDR_speed
   //      with divclk_divide = 1, clkout_divide = 4
+  setCLKspeed(fpga, freq_mult, 1, 4);
 
-
-  int new_clk_speed = setCLKspeed(fpga, freq_mult, 1, 4);
+  printf("Getting clock Speed\n");
+  int new_clk_speed = getCLKspeed(fpga);
   if (new_clk_speed < 0) {
     printf("Error: Something went wrong during Clk speed change");
-    return;
+    return -1;
   } else {
     printf("%dMHz\nClk Change Successful!\n", new_clk_speed);
   }
