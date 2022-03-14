@@ -18,7 +18,3 @@ hw/boards/ML605/tb_softMC_top_isim_beh.wdb
 hw/boards/ML605/tb_softMC_top_isim_beh.exe
 hw/boards/ML605/isim.log
 hw/boards/ML605/isim.cmd
-
-sw/RetentionRating/RetentionRating.o
-sw/RetentionTest/RetentionTest.o
-sw/Test/test.o

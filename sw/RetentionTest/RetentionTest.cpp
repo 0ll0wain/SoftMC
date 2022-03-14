@@ -5,8 +5,20 @@
 #include <iostream>
 #include <cmath>
 #include "softmc.h"
+#include <fstream>
 
 using namespace std;
+
+void flushReadFIFO(fpga_t *fpga)
+{
+  printf("Start Read FIFO flushing\n");
+  unsigned int rbuf[16];
+  for (int i = 0; i < 200;
+       i++)
+  {
+    fpga_recv(fpga, 0, (void *)rbuf, 16, 5);
+  }
+}
 
 // Note that capacity of the instruction buffer is 8192 instructions
 void writeRow(fpga_t *fpga, uint row, uint bank, uint8_t pattern,
@@ -58,7 +70,7 @@ void writeRow(fpga_t *fpga, uint row, uint bank, uint8_t pattern,
 }
 
 void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
-                       const uint8_t pattern, InstructionSequence *&iseq)
+                       const uint8_t pattern, InstructionSequence *&iseq, ofstream &log)
 {
 
   if (iseq == nullptr)
@@ -105,21 +117,35 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
 
   iseq->execute(fpga);
 
+  //64 bit pattern
+
+  uint64_t pattern_64 = 0;
+
+  for (int i = 0; i < 7; i++)
+  {
+    pattern_64 |= (uint64_t)pattern;
+    pattern_64 = (pattern_64 << 8);
+  }
+  pattern_64 |= (uint64_t)pattern;
+
   // Receive the data
   uint rbuf[16];
   for (int i = 0; i < NUM_COLS;
        i += 8)
-  { // we receive a single burst at two times (32 bytes each)
+  { // we receive a single burst(8x8 bytes = 64 bytes)
     fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
 
     // compare with the pattern
-    uint8_t *rbuf8 = (uint8_t *)rbuf;
+    uint64_t *rbuf64 = (uint64_t *)rbuf;
 
-    for (int j = 0; j < 64; j++)
+    for (int j = 0; j < 8; j++)
     {
-      if (rbuf8[j] != pattern)
-        fprintf(stderr, "Error at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i,
-                row, bank, rbuf8[j]);
+      if (rbuf64[j] != pattern_64)
+      {
+        log << dec << bank << "," << row << "," << i + j << "," << hex << rbuf64[j] << endl;
+        fprintf(stderr, "Error at Col: %d, Row: %u, Bank: %u, DATA: %lx \n", i + j,
+                row, bank, rbuf64[j]);
+      }
     }
   }
 }
@@ -151,14 +177,18 @@ void turnBus(fpga_t *fpga, BUSDIR b, InstructionSequence *iseq = nullptr)
 */
 void testRetention(fpga_t *fpga, const int retention)
 {
-
   uint8_t pattern = 0xff; // the data pattern that we write to the DRAM
+
+  ofstream log("Bank.csv");
+  log << "Bank,Row,Col,Data," << retention << endl;
 
   bool dimm_done = false;
 
   InstructionSequence *iseq = nullptr; // we temporarily store (before sending
                                        // them to the FPGA) the generated
                                        // instructions here
+
+  flushReadFIFO(fpga);
 
   GET_TIME_INIT(2);
 
@@ -196,13 +226,6 @@ void testRetention(fpga_t *fpga, const int retention)
       if (cur_row_write == NUM_ROWS)
       {
         cur_row_write = 0;
-        cur_bank_write++;
-      }
-
-      // the entire DIMM is covered when we complete testing all of the bank
-      if (cur_bank_write == NUM_BANKS)
-      {
-        // we are done with the entire DIMM
         dimm_done = true;
         break;
       }
@@ -220,26 +243,20 @@ void testRetention(fpga_t *fpga, const int retention)
     // Read the data back and compare
     for (int i = 0; i < group_size; i++)
     {
-      readAndCompareRow(fpga, cur_row_read, cur_bank_read, pattern, iseq);
+      readAndCompareRow(fpga, cur_row_read, cur_bank_read, pattern, iseq, log);
 
       cur_row_read++;
 
       if (cur_row_read == NUM_ROWS)
       { // NUM_ROWS
         cur_row_read = 0;
-        cur_bank_read++;
-      }
-
-      if (cur_bank_read == NUM_BANKS)
-      { // NUM_BANKS
-        // we are done with the entire DIMM
         break;
       }
     }
   }
 
   printf("\n");
-
+  log.close();
   delete iseq;
 }
 

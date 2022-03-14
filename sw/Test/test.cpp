@@ -111,16 +111,15 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
   for (int i = 0; i < NUM_COLS;
        i += 8)
   {
-
     fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
-    for (size_t i = 0; i < 16; i++)
+    for (size_t j = 0; j < 16; j++)
     {
-      printf("%x\n", rbuf[i]);
+      printf("%x\n", rbuf[j]);
     }
   }
   // for (int i = 0; i < NUM_COLS;
   //      i += 8)
-  // { // we receive a single burst at two times (32 bytes each)
+  // { // we receive a single burst(8x8 bytes = 64 bytes)
 
   //   uint rbuf[16];
   //   fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
@@ -170,13 +169,13 @@ void test(fpga_t *fpga)
 
   uint cur_row = 0;
   uint cur_bank = 0;
-  // printf("Start Read FIFO flushing\n");
-  // unsigned int rbuf[16];
-  // for (int i = 0; i < 100;
-  //      i++)
-  // {
-  //   fpga_recv(fpga, 0, (void *)rbuf, 16, 20);
-  // }
+  printf("Start Read FIFO flushing\n");
+  unsigned int rbuf[16];
+  for (int i = 0; i < 200;
+       i++)
+  {
+    fpga_recv(fpga, 0, (void *)rbuf, 16, 5);
+  }
 
   // printf("Read FIFo flushed\n");
   turnBus(fpga, BUSDIR::WRITE, iseq);
@@ -238,28 +237,61 @@ int main(int argc, char *argv[])
     printf("%d: device id:%04X\n", i, info.device_id[i]);
   }
 
-  // Open an FPGA device, so we can read/write from/to it
-  fpga = fpga_open(fid);
+  // // Open an FPGA device, so we can read/write from/to it
+  // fpga = fpga_open(fid);
 
-  if (!fpga)
+  // if (!fpga)
+  // {
+  //   printf("Problem on opening the fpga \n");
+  //   return -1;
+  // }
+  // printf("The FPGA has been opened successfully! \n");
+
+  // // send a reset signal to the FPGA
+  // fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
+
+  // // uint trefi = 7800/200; //7.8us (divide by 200ns as the HW counts with that
+  // // period)
+  // // uint trfc = 104; //default trfc for 4Gb device
+  // // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
+  // // setRefreshConfig(fpga, trefi, trfc);
+
+  // test(fpga);
+
+  // fpga_close(fpga);
+
+  //64 bit pattern
+
+  uint8_t pattern = 0xff;
+
+  uint64_t pattern_64 = 0;
+
+  for (int i = 0; i < 7; i++)
   {
-    printf("Problem on opening the fpga \n");
-    return -1;
+    pattern_64 |= (uint64_t)pattern;
+    pattern_64 = (pattern_64 << 8);
   }
-  printf("The FPGA has been opened successfully! \n");
+  pattern_64 |= (uint64_t)pattern;
 
-  // send a reset signal to the FPGA
-  fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
+  // Receive the data
+  uint rbuf[16];
+  for (int i = 0; i < NUM_COLS;
+       i += 8)
+  { // we receive a single burst(8x8 bytes = 64 bytes)
+    for (int i = 0; i < 16; i++)
+    {
+      rbuf[i] = 0xffffffff;
+    }
 
-  // uint trefi = 7800/200; //7.8us (divide by 200ns as the HW counts with that
-  // period)
-  // uint trfc = 104; //default trfc for 4Gb device
-  // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
-  // setRefreshConfig(fpga, trefi, trfc);
+    // compare with the pattern
+    uint64_t *rbuf8 = (uint64_t *)rbuf;
 
-  test(fpga);
-
-  fpga_close(fpga);
+    for (int j = 0; j < 8; j++)
+    {
+      if (rbuf8[j] != pattern_64)
+        printf("DATA: %lx \n", rbuf8[j]);
+    }
+  }
 
   return 0;
 }
