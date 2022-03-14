@@ -1,0 +1,15 @@
+{
+  "folders": [
+	{
+		"path": "sw"
+	},
+	{
+		"path": "hw/boards/ML605"
+	}
+],
+  "settings": {
+    "files.associations": {
+      "cassert": "cpp"
+    }
+  }
+}

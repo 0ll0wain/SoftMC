@@ -58,8 +58,8 @@ void writeRow(fpga_t *fpga, uint row, uint bank, uint8_t pattern,
   iseq->execute(fpga);
 }
 
-void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
-                       const uint8_t pattern, InstructionSequence *&iseq)
+void readRow(fpga_t *fpga, const uint row, const uint bank,
+             InstructionSequence *&iseq)
 {
 
   if (iseq == nullptr)
@@ -187,9 +187,22 @@ void test(fpga_t *fpga)
 
   sleep(1);
 
-  // Read the data back and compare
+  // Read the data back
 
-  readAndCompareRow(fpga, cur_row, cur_bank, pattern, iseq);
+  readRow(fpga, cur_row, cur_bank, iseq);
+
+  // Receive the data
+  unsigned int rbuf[32];
+  for (size_t i = 0; i < NUM_COLS; i++)
+  {
+
+    printf("Received Words: %d", fpga_recv(fpga, 0, (void *)rbuf, 32, 0));
+
+    for (size_t i = 0; i < 32; i++)
+    {
+      printf("%x\n", rbuf[i]);
+    }
+  }
 
   printf("\n");
 
@@ -270,28 +283,32 @@ int main(int argc, char *argv[])
   {
     pattern_64 |= (uint64_t)pattern;
     pattern_64 = (pattern_64 << 8);
-  }
-  pattern_64 |= (uint64_t)pattern;
-
-  // Receive the data
-  uint rbuf[16];
-  for (int i = 0; i < NUM_COLS;
-       i += 8)
-  { // we receive a single burst(8x8 bytes = 64 bytes)
-    for (int i = 0; i < 16; i++)
+    if (!fpga)
     {
-      rbuf[i] = 0xffffffff;
+      printf("Problem on opening the fpga \n");
+      return -1;
+    }
+    pattern_64 |= (uint64_t)pattern;
+
+    // Receive the data
+    uint rbuf[16];
+    for (int i = 0; i < NUM_COLS;
+         i += 8)
+    { // we receive a single burst(8x8 bytes = 64 bytes)
+      for (int i = 0; i < 16; i++)
+      {
+        rbuf[i] = 0xffffffff;
+      }
+
+      // compare with the pattern
+      uint64_t *rbuf8 = (uint64_t *)rbuf;
+
+      for (int j = 0; j < 8; j++)
+      {
+        if (rbuf8[j] != pattern_64)
+          printf("DATA: %lx \n", rbuf8[j]);
+      }
     }
 
-    // compare with the pattern
-    uint64_t *rbuf8 = (uint64_t *)rbuf;
-
-    for (int j = 0; j < 8; j++)
-    {
-      if (rbuf8[j] != pattern_64)
-        printf("DATA: %lx \n", rbuf8[j]);
-    }
+    return 0;
   }
-
-  return 0;
-}
