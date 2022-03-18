@@ -5,13 +5,13 @@
 #include <iostream>
 #include <cmath>
 #include "softmc.h"
-#include<unistd.h>
+#include <unistd.h>
 
 using namespace std;
 
-#define s  1000000
-#define ms  1000
-#define us  1
+#define s 1000000
+#define ms 1000
+#define us 1
 
 // Note that capacity of the instruction buffer is 8192 instructions
 void writeRow(fpga_t *fpga, uint row, uint bank, uint8_t pattern,
@@ -126,7 +126,7 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
         printf("Error at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i + j, row,
                bank, rbuf8[j]);
       else
-        printf("Testet successfully at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i +(j/4), row,
+        printf("Testet successfully at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i + (j / 4), row,
                bank, rbuf8[j]);
     }
   }
@@ -305,7 +305,8 @@ void setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
   return;
 }
 
-int getCLKspeed(fpga_t *fpga){
+int getCLKspeed(fpga_t *fpga)
+{
 
   // Receive the data
   uint rbuf[8];
@@ -313,7 +314,8 @@ int getCLKspeed(fpga_t *fpga){
 
   printf("Read Result: %d", read_result);
 
-  if (read_result < 0) {
+  if (read_result < 0)
+  {
     return -1;
   }
 
@@ -343,13 +345,15 @@ void printHelp(char *argv[])
        << endl;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   fpga_t *fpga;
   fpga_info_list info;
   int fid = 0; // fpga id
   int ch = 0;  // channel id
 
-  if (argc != 2 || strcmp(argv[1], "--help") == 0) {
+  if (argc != 2 || strcmp(argv[1], "--help") == 0)
+  {
     printHelp(argv);
     return -2;
   }
@@ -357,14 +361,18 @@ int main(int argc, char *argv[]) {
   string s_freq(argv[1]);
   int freq_mult = 0;
 
-  try {
+  try
+  {
     freq_mult = stoi(s_freq);
-  } catch (...) {
+  }
+  catch (...)
+  {
     printHelp(argv);
     return -3;
   }
 
-  if (freq_mult < 0) {
+  if (freq_mult < 0)
+  {
     printHelp(argv);
     return -4;
   }
@@ -411,17 +419,20 @@ int main(int argc, char *argv[]) {
   printf("Setting clock Speed\n");
 
   // set speed to x MHz
-  // Default is (6,1,3), corresponds to 800 Mhz DDR Clk and 400 MHz Fabric Clk
+  // Default is (6,1,3), corresponds to 400 Mhz DDR Clk and 200 MHz Fabric Clk
   // Tip: Only adjust first parameter -> clkfbout_mult * 100MHz = DDR_speed
   //      with divclk_divide = 1, clkout_divide = 4
   setCLKspeed(fpga, freq_mult, 1, 4);
 
   printf("Getting clock Speed\n");
   int new_clk_speed = getCLKspeed(fpga);
-  if (new_clk_speed < 0) {
+  if (new_clk_speed < 0)
+  {
     printf("Error: Something went wrong during Clk speed change");
     return -1;
-  } else {
+  }
+  else
+  {
     printf("%dMHz\nClk Change Successful!\n", new_clk_speed);
   }
 

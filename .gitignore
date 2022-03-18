@@ -18,3 +18,7 @@ hw/boards/ML605/tb_softMC_top_isim_beh.wdb
 hw/boards/ML605/tb_softMC_top_isim_beh.exe
 hw/boards/ML605/isim.log
 hw/boards/ML605/isim.cmd
+
+sw/SenseAmpActivation/results
+sw/RetentionTest/BankTestsRetentionRoomtemperature
+*.o

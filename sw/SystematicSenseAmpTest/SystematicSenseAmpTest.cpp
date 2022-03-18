@@ -7,6 +7,7 @@
 #include "softmc.h"
 #include <fstream>
 #include <unistd.h>
+#include <sstream>
 
 using namespace std;
 
@@ -123,54 +124,6 @@ void sendRowColumnReadCommand(fpga_t *fpga, uint row, uint bank, uint column,
   iseq->execute(fpga);
 }
 
-void sendRowReadCommand(fpga_t *fpga, uint row, uint bank,
-                        InstructionSequence *&iseq, uint tRCD)
-{
-  if (iseq == nullptr)
-    iseq = new InstructionSequence();
-  else
-    iseq->size = 0; // reuse the provided InstructionSequence to avoid dynamic
-                    // allocation for each call
-
-  // Precharge target bank (just in case if its left activated)
-  iseq->insert(genPRE(bank, PRE_TYPE::SINGLE));
-
-  // Wait for tRP
-  iseq->insert(genWAIT(5)); // 2.5ns have already been passed as we issue in
-                            // next cycle. So, 5 means 6 cycles latency, 15 ns
-
-  // Activate target row
-  iseq->insert(genACT(bank, row));
-
-  // Wait for tRCD
-  iseq->insert(genWAIT(tRCD));
-
-  // Read the entire row
-  for (int i = 0; i < NUM_COLS; i += 8)
-  { // we use 8x burst mode
-    iseq->insert(genRD(bank, i));
-
-    // We need to wait for tCL and 4 cycles burst (double data-rate)
-    iseq->insert(genWAIT(6 + 4));
-  }
-
-  // Wait some more in any case
-  iseq->insert(genWAIT(3));
-
-  // Precharge target bank
-  iseq->insert(genPRE(
-      bank, PRE_TYPE::SINGLE)); // pre 1 -> precharge all, pre 0 precharge bank
-
-  // Wait for tRP
-  iseq->insert(genWAIT(5)); // we have already 2.5ns passed as we issue in next
-                            // cycle. So, 5 means 6 cycles latency, 15 ns
-
-  // START Transaction
-  iseq->insert(genEND());
-
-  iseq->execute(fpga);
-}
-
 void receiveRowData(fpga_t *fpga, uint64_t *data)
 {
   // Receive the data
@@ -179,7 +132,6 @@ void receiveRowData(fpga_t *fpga, uint64_t *data)
   { // we receive 64 bytes (8x64bit)
     fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
 
-    // compare with the pattern
     uint64_t *rbuf64 = (uint64_t *)rbuf;
 
     for (int j = 0; j < 8; j++)
@@ -188,73 +140,6 @@ void receiveRowData(fpga_t *fpga, uint64_t *data)
     }
   }
   return;
-}
-
-void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
-                       const uint8_t pattern, InstructionSequence *&iseq)
-{
-
-  if (iseq == nullptr)
-    iseq = new InstructionSequence();
-  else
-    iseq->size = 0; // reuse the provided InstructionSequence to avoid dynamic
-                    // allocation for each call
-
-  // Precharge target bank (just in case if its left activated)
-  iseq->insert(genPRE(bank, PRE_TYPE::SINGLE));
-
-  // Wait for tRP
-  iseq->insert(genWAIT(5)); // 2.5ns have already been passed as we issue in
-                            // next cycle. So, 5 means 6 cycles latency, 15 ns
-
-  // Activate target row
-  iseq->insert(genACT(bank, row));
-
-  // Wait for tRCD
-  iseq->insert(genWAIT(5));
-
-  // Read the entire row
-  for (int i = 0; i < NUM_COLS; i += 8)
-  { // we use 8x burst mode
-    iseq->insert(genRD(bank, i));
-
-    // We need to wait for tCL and 4 cycles burst (double data-rate)
-    iseq->insert(genWAIT(6 + 4));
-  }
-
-  // Wait some more in any case
-  iseq->insert(genWAIT(3));
-
-  // Precharge target bank
-  iseq->insert(genPRE(
-      bank, PRE_TYPE::SINGLE)); // pre 1 -> precharge all, pre 0 precharge bank
-
-  // Wait for tRP
-  iseq->insert(genWAIT(5)); // we have already 2.5ns passed as we issue in next
-                            // cycle. So, 5 means 6 cycles latency, 15 ns
-
-  // START Transaction
-  iseq->insert(genEND());
-
-  iseq->execute(fpga);
-
-  // Receive the data
-  uint rbuf[16];
-  for (int i = 0; i < NUM_COLS;
-       i += 8)
-  { // we receive a single burst at two times (32 bytes each)
-    fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
-
-    // compare with the pattern
-    uint8_t *rbuf8 = (uint8_t *)rbuf;
-
-    for (int j = 0; j < 64; j++)
-    {
-      if (rbuf8[j] != pattern)
-        fprintf(stderr, "Error at Col: %d, Row: %u, Bank: %u, DATA: %x \n", i,
-                row, bank, rbuf8[j]);
-    }
-  }
 }
 
 void turnBus(fpga_t *fpga, BUSDIR b, InstructionSequence *iseq = nullptr)
@@ -277,67 +162,100 @@ void turnBus(fpga_t *fpga, BUSDIR b, InstructionSequence *iseq = nullptr)
   iseq->execute(fpga);
 }
 
-void testSenseAmpActivation(fpga_t *fpga)
+void testSenseAmpActivation(fpga_t *fpga, uint8_t pattern, uint retentionTime, uint tRCD, uint64_t *errors, float *errorProzent)
 {
-
-  uint8_t pattern = 0xff; // the data pattern that we write to the DRAM
 
   InstructionSequence *iseq = nullptr; // we temporarily store (before sending
                                        // them to the FPGA) the generated
                                        // instructions here
 
-  uint tRCD_max = 2;
-  uint64_t results[tRCD_max][NUM_COLS];
-  uint row = 31482;
+  uint64_t results[NUM_COLS];
 
-  // Iterate through different tRCD
-  for (size_t tRCD = 1; tRCD < tRCD_max + 1; tRCD++)
+  //64 bit pattern
+
+  uint64_t pattern_64 = 0;
+
+  for (int i = 0; i < 7; i++)
   {
+    pattern_64 |= (uint64_t)pattern;
+    pattern_64 = (pattern_64 << 8);
+  }
+  pattern_64 |= (uint64_t)pattern;
+
+  if (retentionTime == 0)
+  {
+    retentionTime = 1;
+  }
+
+  for (uint row = 0; row < 5 /*NUM_ROWS*/; row++)
+  {
+    printf("Row:%d\n", row);
     turnBus(fpga, BUSDIR::WRITE, iseq);
     writeRow(fpga, row, 0, pattern, iseq);
-    sleep(120);
+    sleep(retentionTime);
     turnBus(fpga, BUSDIR::READ, iseq);
-
     // Read the entire row
     for (int i = 0; i < NUM_COLS; i += 8)
     { // we use 8x burst mode
       sendRowColumnReadCommand(fpga, row, 0, i, iseq, tRCD);
     }
-    //sendRowReadCommand(fpga, 0, 0, iseq, i);
-    receiveRowData(fpga, results[tRCD - 1]);
-  }
+    receiveRowData(fpga, results);
 
-  // write results into file
-  ofstream resultFile("result.csv");
-  resultFile << "Col, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10" << endl;
-  for (size_t i = 0; i < NUM_COLS; i++)
-  {
-    resultFile << dec << i << hex;
-    for (size_t j = 0; j < tRCD_max; j++)
+    for (uint i = 0; i < NUM_COLS; i++)
     {
-      resultFile << "," << results[j][i];
+      if (results[i] != pattern)
+      {
+        uint64_t testMask = 0x00000001;
+        for (uint j = 0; j < 64; j++)
+        {
+          uint64_t testResult = results[i] || testMask;
+          uint64_t testPattern = pattern || testMask;
+
+          if (testResult != testPattern)
+          {
+            *errors++;
+          }
+          testMask << 1;
+        }
+      }
     }
-    resultFile << endl;
   }
-  resultFile.close();
+  uint64_t numWords = 5 * NUM_COLS;
+  *errorProzent = *errors / (numWords * 64) * 100;
 }
 
-// provide trefi = 0 to disable auto-refresh
-// auto-refresh is disabled by default (disabled after FPGA boots, disables on
-// pushing reset button)
-void setRefreshConfig(fpga_t *fpga, uint trefi, uint trfc)
+void systematicTest(fpga_t *fpga, string testedChip, string temp, uint8_t pattern)
 {
-  InstructionSequence *iseq = new InstructionSequence;
+  ostringstream filePath;
+  filePath << "results/" << testedChip << temp << "°C/" << hex << +pattern << "/";
+  ostringstream fileName;
+  fileName << testedChip << temp << "x" << hex << +pattern << dec << ".csv";
+  ofstream resultFile(filePath.str() + fileName.str());
 
-  iseq->insert(genREF_CONFIG(trfc, REGISTER::TRFC));
-  iseq->insert(genREF_CONFIG(trefi, REGISTER::TREFI));
+  resultFile << "clkSpeed,retention,tRCD,FehlerAbs,FehlerProzent" << endl;
+  for (size_t i = 6; i <= 10; i++)
+  {
+    size_t clkSpeed = (200 * i / 4);
+    printf("Set Clock to: %ld\n", clkSpeed);
+    setCLKspeed(fpga, i, 1, 4);
+    usleep(200);
 
-  // START Transaction
-  iseq->insert(genEND());
+    for (uint retention = 0; retention < 60; retention += 5)
+    {
+      printf("Start Test with Retention Time: %d\n", retention);
+      uint64_t errors = 0;
+      float errorProzent;
+      for (uint tRCD = 1; tRCD < 9; tRCD++)
+      {
+        printf("tRCD: %d\n", tRCD);
+        testSenseAmpActivation(fpga, pattern, retention, tRCD, &errors, &errorProzent);
+        resultFile << clkSpeed << "," << retention << "," << tRCD << "," << errors << "," << errorProzent << endl;
+        errors = 0;
+      }
+    }
+  }
 
-  iseq->execute(fpga);
-
-  delete iseq;
+  resultFile.close();
 }
 
 int main(int argc, char *argv[])
@@ -375,20 +293,18 @@ int main(int argc, char *argv[])
 
   // send a reset signal to the FPGA
   fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
-
-  // uint trefi = 7800/200; //7.8us (divide by 200ns as the HW counts with that
-  // period)
-  // uint trfc = 104; //default trfc for 4Gb device
-  // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
-  // setRefreshConfig(fpga, trefi, trfc);
-
+  usleep(100);
   flushReadFIFO(fpga);
 
-  setCLKspeed(fpga, 6, 1, 4);
-  sleep(1);
+  string testedChip = "Micron";
+  string temperature = "20";
+  uint8_t pattern = 0xff;
 
-  printf("Start Testing\n");
-  testSenseAmpActivation(fpga);
+  systematicTest(fpga, testedChip, temperature, pattern);
+
+  pattern = 0x00;
+
+  systematicTest(fpga, testedChip, temperature, pattern);
 
   printf("The test has been completed! \n");
   fpga_close(fpga);
