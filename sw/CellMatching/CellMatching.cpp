@@ -11,11 +11,9 @@
 
 using namespace std;
 
-#define tRCD_MAX 8
-#define TESTED_CHIP "SamsungLong"
-#define TEMP "40"
-#define RETENTION_STEP 20
-#define RETENTION_STEP_COUNT 7
+#define TESTED_CHIP "Samsung"
+#define TEMP "24"
+#define RETENTION_TIME 20
 
 // set CLK Speed with three parameters
 void setCLKspeed(fpga_t *fpga, uint clkfbout_mult, uint divclk_divide,
@@ -83,6 +81,54 @@ void writeRow(fpga_t *fpga, uint row, uint bank, uint8_t pattern,
 
   // Precharge target bank
   iseq->insert(genPRE(bank, PRE_TYPE::SINGLE));
+
+  // Wait for tRP
+  iseq->insert(genWAIT(5)); // we have already 2.5ns passed as we issue in next
+                            // cycle. So, 5 means 6 cycles latency, 15 ns
+
+  // START Transaction
+  iseq->insert(genEND());
+
+  iseq->execute(fpga);
+}
+
+void sendRowReadCommand(fpga_t *fpga, uint row, uint bank,
+                        InstructionSequence *&iseq, uint tRCD)
+{
+  if (iseq == nullptr)
+    iseq = new InstructionSequence();
+  else
+    iseq->size = 0; // reuse the provided InstructionSequence to avoid dynamic
+                    // allocation for each call
+
+  // Precharge target bank (just in case if its left activated)
+  iseq->insert(genPRE(bank, PRE_TYPE::SINGLE));
+
+  // Wait for tRP
+  iseq->insert(genWAIT(5)); // 2.5ns have already been passed as we issue in
+                            // next cycle. So, 5 means 6 cycles latency, 15 ns
+
+  // Activate target row
+  iseq->insert(genACT(bank, row));
+
+  // Wait for tRCD
+  iseq->insert(genWAIT(tRCD));
+
+  // Read the entire row
+  for (int i = 0; i < NUM_COLS; i += 8)
+  { // we use 8x burst mode
+    iseq->insert(genRD(bank, i));
+
+    // We need to wait for tCL and 4 cycles burst (double data-rate)
+    iseq->insert(genWAIT(6 + 4));
+  }
+
+  // Wait some more in any case
+  iseq->insert(genWAIT(3));
+
+  // Precharge target bank
+  iseq->insert(genPRE(
+      bank, PRE_TYPE::SINGLE)); // pre 1 -> precharge all, pre 0 precharge bank
 
   // Wait for tRP
   iseq->insert(genWAIT(5)); // we have already 2.5ns passed as we issue in next
@@ -218,58 +264,138 @@ void readAndCompare(fpga_t *fpga, uint64_t rowOffset, uint8_t pattern, uint tRCD
   return;
 }
 
-void systematicTest(fpga_t *fpga, uint8_t pattern)
+void readAndMatch(fpga_t *fpga, uint8_t pattern, uint64_t *data, uint64_t *matchs, uint64_t *errors)
 {
-  ostringstream filePath;
-  filePath << "results/" << TESTED_CHIP << TEMP << "°C/";
-  ostringstream fileName;
-  fileName << TESTED_CHIP << TEMP << "x" << hex << +pattern << dec << ".csv";
-  ofstream resultFile(filePath.str() + fileName.str());
-  InstructionSequence *iseq = nullptr; // we temporarily store (before sending
-                                       // them to the FPGA) the generated
-                                       // instructions here
-
-  resultFile << "tRCD in ns,retention,FehlerAbs,FehlerProzent" << endl;
-
-  uint row_count = 100; // NUM_ROWS / (tRCD_MAX * RETENTION_STEP_COUNT);
-  printf("row_count: %d\n", row_count);
-  for (size_t i = 6; i <= 10; i++)
+  // 64 bit pattern
+  uint64_t pattern_64 = 0;
+  for (int i = 0; i < 7; i++)
   {
-    size_t clkSpeed = (200 * i / 4);
-    printf("Set Clock to: %ld\n", clkSpeed);
-    setCLKspeed(fpga, i, 1, 4);
-    sleep(1);
+    pattern_64 |= (uint64_t)pattern;
+    pattern_64 = (pattern_64 << 8);
+  }
+  pattern_64 |= (uint64_t)pattern;
 
-    // write Rows
-    turnBus(fpga, BUSDIR::WRITE, iseq);
-    for (uint row = 0; row < row_count * tRCD_MAX * RETENTION_STEP_COUNT; row++)
+  // Receive the data
+  uint rbuf[16];
+  for (int i = 0; i < NUM_COLS; i += 8)
+  { // we receive 64 bytes (8x64bit)
+    fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
+
+    uint64_t *rbuf64 = (uint64_t *)rbuf;
+
+    for (int j = 0; j < 8; j++)
     {
-      writeRow(fpga, row, 0, pattern, iseq);
-      usleep(1);
-    }
-    usleep(20);
-    // Read Rows
-    turnBus(fpga, BUSDIR::READ, iseq);
-    uint64_t rowOffset = 0;
-    for (uint retention = 0; retention < RETENTION_STEP_COUNT; retention++)
-    {
-      uint64_t errors = 0;
-      float errorProzent;
-      for (uint tRCD = 1; tRCD <= tRCD_MAX; tRCD++)
+      if (rbuf64[j] != pattern_64)
       {
-        printf("tRCD: %d\n", tRCD);
-        readAndCompare(fpga, rowOffset, pattern, tRCD, &errors, &errorProzent, row_count);
-        rowOffset += row_count;
-        float tRCDns = (float)(tRCD * 1000) / (float)clkSpeed;
-        resultFile << tRCDns << "," << retention * RETENTION_STEP << "," << errors << "," << errorProzent << endl;
-        errors = 0;
+        uint column = j + i;
+        uint64_t testMask = 0x00000001;
+        for (uint b = 0; b < 64; b++)
+        {
+          uint64_t testResult = rbuf64[j] & testMask;
+          uint64_t testPattern = pattern_64 & testMask;
+          uint64_t testData = data[column] & testMask;
+
+          if (testResult != testPattern)
+          {
+            *errors = *errors + 1;
+            if (testData != testPattern)
+            {
+              *matchs = *matchs + 1;
+            }
+          }
+          testMask = testMask << 1;
+        }
       }
-      sleep(RETENTION_STEP);
     }
   }
-
-  resultFile.close();
   return;
+}
+
+void readAndCountErrors(fpga_t *fpga, uint8_t pattern, uint64_t *errors)
+{
+  // 64 bit pattern
+  uint64_t pattern_64 = 0;
+  for (int i = 0; i < 7; i++)
+  {
+    pattern_64 |= (uint64_t)pattern;
+    pattern_64 = (pattern_64 << 8);
+  }
+  pattern_64 |= (uint64_t)pattern;
+
+  // Receive the data
+  uint rbuf[16];
+  for (int i = 0; i < NUM_COLS; i += 8)
+  { // we receive 64 bytes (8x64bit)
+    fpga_recv(fpga, 0, (void *)rbuf, 16, 0);
+
+    uint64_t *rbuf64 = (uint64_t *)rbuf;
+
+    for (int j = 0; j < 8; j++)
+    {
+      if (rbuf64[j] != pattern_64)
+      {
+        uint64_t testMask = 0x00000001;
+        for (uint bit = 0; bit < 64; bit++)
+        {
+          uint64_t testResult = rbuf64[j] & testMask;
+          uint64_t testPattern = pattern_64 & testMask;
+
+          if (testResult != testPattern)
+          {
+            *errors = *errors + 1;
+          }
+          testMask = testMask << 1;
+        }
+      }
+    }
+  }
+}
+
+void cellMatchingTest(fpga_t *fpga, uint8_t pattern)
+{
+  InstructionSequence *iseq = nullptr;
+  uint bank = 0;
+  uint64_t errors = 0;
+  uint64_t matchs = 0;
+  uint TestedRows = 100;
+  uint64_t timingTestResults[TestedRows][NUM_COLS];
+
+  printf("Get Timing Errors\n");
+  turnBus(fpga, BUSDIR::WRITE, iseq);
+  for (uint row = 0; row < TestedRows; row++)
+  {
+    // Get Failing Cells with tRCD = 1 and save for one row
+
+    writeRow(fpga, row, bank, pattern, iseq);
+    turnBus(fpga, BUSDIR::READ, iseq);
+    for (uint col = 0; col < NUM_COLS; col++)
+    {
+      sendRowColumnReadCommand(fpga, row, bank, col, iseq, 1);
+    }
+
+    receiveRowData(fpga, timingTestResults[row]);
+  }
+  printf("Write Data for Retentiontest\n");
+  turnBus(fpga, BUSDIR::WRITE, iseq);
+  for (uint row = 0; row < TestedRows; row++)
+  { // Test for Weak Cells and check if it matches with step 1
+    writeRow(fpga, row, bank, pattern, iseq);
+  }
+  for (uint i = RETENTION_TIME; i > 0; i--)
+  {
+    printf("Wait. %ds left.\n", i);
+    sleep(1);
+  }
+  turnBus(fpga, BUSDIR::READ, iseq);
+  for (uint row = 0; row < TestedRows; row++)
+  {
+
+    sendRowReadCommand(fpga, row, bank, iseq, 5);
+    readAndMatch(fpga, pattern, timingTestResults[row], &matchs, &errors);
+    // readAndCountErrors(fpga, pattern, &errors);
+  }
+  printf("Matchs: %ld, Errors: %ld\n", matchs, errors);
+  printf("Errors Matched: %f\n", ((float)matchs / (float)errors) * 100);
 }
 
 // provide trefi = 0 to disable auto-refresh
@@ -326,17 +452,11 @@ int main(int argc, char *argv[])
   // send a reset signal to the FPGA
   fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
   usleep(100);
-  setRefreshConfig(fpga, 0, 104);
-  usleep(100);
   flushReadFIFO(fpga);
 
-  // uint8_t pattern = 0xff;
+  uint8_t pattern = 0xff;
 
-  // systematicTest(fpga, pattern);
-
-  uint8_t pattern = 0x00;
-
-  systematicTest(fpga, pattern);
+  cellMatchingTest(fpga, pattern);
 
   printf("The test has been completed! \n");
   fpga_close(fpga);

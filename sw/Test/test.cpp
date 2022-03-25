@@ -153,62 +153,6 @@ void turnBus(fpga_t *fpga, BUSDIR b, InstructionSequence *iseq = nullptr)
   iseq->execute(fpga);
 }
 
-//! Runs a test to check the DRAM cells against the given retention time.
-/*!
-  \param \e fpga is a pointer to the RIFFA FPGA device.
-  \param \e retention is the retention time in milliseconds to test.
-*/
-void test(fpga_t *fpga)
-{
-
-  uint8_t pattern = 0x66; // the data pattern that we write to the DRAM
-
-  InstructionSequence *iseq = nullptr; // we temporarily store (before sending
-                                       // them to the FPGA) the generated
-                                       // instructions here
-
-  uint cur_row = 0;
-  uint cur_bank = 0;
-  printf("Start Read FIFO flushing\n");
-  unsigned int rbuf[16];
-  for (int i = 0; i < 200;
-       i++)
-  {
-    fpga_recv(fpga, 0, (void *)rbuf, 16, 5);
-  }
-
-  // printf("Read FIFo flushed\n");
-  turnBus(fpga, BUSDIR::WRITE, iseq);
-
-  writeRow(fpga, cur_row, cur_bank, pattern, iseq);
-
-  // Switch the memory bus to read mode
-  turnBus(fpga, BUSDIR::READ, iseq);
-
-  sleep(1);
-
-  // Read the data back
-
-  readRow(fpga, cur_row, cur_bank, iseq);
-
-  // Receive the data
-  unsigned int rbuf[32];
-  for (size_t i = 0; i < NUM_COLS; i++)
-  {
-
-    printf("Received Words: %d", fpga_recv(fpga, 0, (void *)rbuf, 32, 0));
-
-    for (size_t i = 0; i < 32; i++)
-    {
-      printf("%x\n", rbuf[i]);
-    }
-  }
-
-  printf("\n");
-
-  delete iseq;
-}
-
 // provide trefi = 0 to disable auto-refresh
 // auto-refresh is disabled by default (disabled after FPGA boots, disables on
 // pushing reset button)
@@ -229,86 +173,49 @@ void setRefreshConfig(fpga_t *fpga, uint trefi, uint trfc)
 
 int main(int argc, char *argv[])
 {
-  fpga_t *fpga;
-  fpga_info_list info;
-  int fid = 0; // fpga id
-  int ch = 0;  // channel id
-
-  // Get the list of FPGA's attached to the system
-  if (fpga_list(&info) != 0)
-  {
-    printf("Error populating fpga_info_list\n");
-    return -1;
-  }
-  printf("Number of devices: %d\n", info.num_fpgas);
-  for (int i = 0; i < info.num_fpgas; i++)
-  {
-    printf("%d: id:%d\n", i, info.id[i]);
-    printf("%d: num_chnls:%d\n", i, info.num_chnls[i]);
-    printf("%d: name:%s\n", i, info.name[i]);
-    printf("%d: vendor id:%04X\n", i, info.vendor_id[i]);
-    printf("%d: device id:%04X\n", i, info.device_id[i]);
-  }
-
-  // // Open an FPGA device, so we can read/write from/to it
-  // fpga = fpga_open(fid);
-
-  // if (!fpga)
-  // {
-  //   printf("Problem on opening the fpga \n");
-  //   return -1;
-  // }
-  // printf("The FPGA has been opened successfully! \n");
-
-  // // send a reset signal to the FPGA
-  // fpga_reset(fpga); // keep this, recovers FPGA from some unwanted state
-
-  // // uint trefi = 7800/200; //7.8us (divide by 200ns as the HW counts with that
-  // // period)
-  // // uint trfc = 104; //default trfc for 4Gb device
-  // // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
-  // // setRefreshConfig(fpga, trefi, trfc);
-
-  // test(fpga);
-
-  // fpga_close(fpga);
-
-  //64 bit pattern
-
   uint8_t pattern = 0xff;
-
+  // 64 bit pattern
   uint64_t pattern_64 = 0;
-
   for (int i = 0; i < 7; i++)
   {
     pattern_64 |= (uint64_t)pattern;
     pattern_64 = (pattern_64 << 8);
-    if (!fpga)
-    {
-      printf("Problem on opening the fpga \n");
-      return -1;
-    }
-    pattern_64 |= (uint64_t)pattern;
-
-    // Receive the data
-    uint rbuf[16];
-    for (int i = 0; i < NUM_COLS;
-         i += 8)
-    { // we receive a single burst(8x8 bytes = 64 bytes)
-      for (int i = 0; i < 16; i++)
-      {
-        rbuf[i] = 0xffffffff;
-      }
-
-      // compare with the pattern
-      uint64_t *rbuf8 = (uint64_t *)rbuf;
-
-      for (int j = 0; j < 8; j++)
-      {
-        if (rbuf8[j] != pattern_64)
-          printf("DATA: %lx \n", rbuf8[j]);
-      }
-    }
-
-    return 0;
   }
+  pattern_64 |= (uint64_t)pattern;
+
+  uint64_t match = 0;
+  uint64_t errors = 0;
+
+  uint64_t rbuf64[8] = {0x0fffffffffffffff, 0x6fffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff};
+  uint64_t data[8] = {0xffffffffffffffff, 0x6fffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff};
+  for (int j = 0; j < 8; j++)
+  {
+    if (rbuf64[j] != pattern_64)
+    {
+      uint column = j;
+      uint64_t testMask = 0x00000001;
+      for (uint bit = 0; bit < 64; bit++)
+      {
+        uint64_t testResult = rbuf64[j] & testMask;
+        uint64_t testPattern = pattern_64 & testMask;
+        uint64_t testData = data[column] & testMask;
+
+        if (testResult != testPattern)
+        {
+          errors++;
+          if (testData != testPattern)
+          {
+            match++;
+          }
+        }
+        testMask = testMask << 1;
+      }
+    }
+    else
+      printf("No Error\n");
+  }
+  printf("Matches: %ld, Errors: %ld\n", match, errors);
+  printf("Result: %f\n", (float)match / (float)errors * 100);
+
+  return 0;
+}

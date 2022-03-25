@@ -277,25 +277,24 @@ void turnBus(fpga_t *fpga, BUSDIR b, InstructionSequence *iseq = nullptr)
   iseq->execute(fpga);
 }
 
-void testSenseAmpActivation(fpga_t *fpga)
+void testSenseAmpActivation(fpga_t *fpga, uint8_t pattern, uint retention)
 {
-
-  uint8_t pattern = 0xff; // the data pattern that we write to the DRAM
 
   InstructionSequence *iseq = nullptr; // we temporarily store (before sending
                                        // them to the FPGA) the generated
                                        // instructions here
 
-  uint tRCD_max = 2;
+  uint tRCD_max = 5;
   uint64_t results[tRCD_max][NUM_COLS];
-  uint row = 31482;
+  uint row = 100;
 
   // Iterate through different tRCD
   for (size_t tRCD = 1; tRCD < tRCD_max + 1; tRCD++)
   {
+    printf("Testing tRCD: %ld\n", tRCD);
     turnBus(fpga, BUSDIR::WRITE, iseq);
     writeRow(fpga, row, 0, pattern, iseq);
-    sleep(120);
+    sleep(retention);
     turnBus(fpga, BUSDIR::READ, iseq);
 
     // Read the entire row
@@ -303,7 +302,7 @@ void testSenseAmpActivation(fpga_t *fpga)
     { // we use 8x burst mode
       sendRowColumnReadCommand(fpga, row, 0, i, iseq, tRCD);
     }
-    //sendRowReadCommand(fpga, 0, 0, iseq, i);
+    // sendRowReadCommand(fpga, 0, 0, iseq, i);
     receiveRowData(fpga, results[tRCD - 1]);
   }
 
@@ -380,18 +379,18 @@ int main(int argc, char *argv[])
   // period)
   // uint trfc = 104; //default trfc for 4Gb device
   // printf("Activating AutoRefresh. tREFI: %d, tRFC: %d \n", trefi, trfc);
-  // setRefreshConfig(fpga, trefi, trfc);
+  // setRefreshConfig(fpga, 0, 104);
 
   flushReadFIFO(fpga);
 
-  setCLKspeed(fpga, 6, 1, 4);
+  setCLKspeed(fpga, 8, 1, 4);
   sleep(1);
-
+  uint8_t pattern = 0xff; // the data pattern thaR we write to the DRAM
+  uint retention = 1;
   printf("Start Testing\n");
-  testSenseAmpActivation(fpga);
+  testSenseAmpActivation(fpga, pattern, retention);
 
   printf("The test has been completed! \n");
   fpga_close(fpga);
-
   return 0;
 }

@@ -22,3 +22,6 @@ hw/boards/ML605/isim.cmd
 sw/SenseAmpActivation/results
 sw/RetentionTest/BankTestsRetentionRoomtemperature
 *.o
+
+sw/SystematicSenseAmpTest/results
+sw/SenseAmpActivation/result.csv

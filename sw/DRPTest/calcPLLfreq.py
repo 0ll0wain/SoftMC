@@ -1,5 +1,5 @@
 base_clk = 200 #Mhz
-clkfbout_mult = 6
+clkfbout_mult = 10
 divclk_divide = 1
 clkout_divide = 4
 

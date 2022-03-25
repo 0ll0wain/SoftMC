@@ -1,0 +1,3 @@
+Roomtemperature 23°C
+Bank 0, Row 31482
+every Column single activate

@@ -1,4 +1,4 @@
-program_NAME := SoftMC_AccessTimings
+program_NAME := SoftMC_CellMatching
 program_CXX_SRCS := $(wildcard *.cpp) $(wildcard ../SoftMC_API/*.cpp)
 program_CXX_OBJS := ${program_CXX_SRCS:.cpp=.o}
 program_OBJS := $(program_CXX_OBJS)
