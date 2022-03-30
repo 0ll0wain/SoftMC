@@ -1,0 +1,56 @@
+Retention wiederholbarkeit:
+100 Rows, 40s Retention 40°C 0xff, Samsung Chip:
+Matchs: 29330, Errors: 33335
+Errors Matched: 87.985596
+Matchs: 38340, Errors: 39097
+Errors Matched: 98.063789
+Matchs: 29720, Errors: 34508
+Errors Matched: 86.124954
+
+tRCD - Retention zusammenhang:
+100 Rows, 40s Retention 40°C 0xff tRCD = 1 400Mhz, Samsung Chip:
+Matchs: 676, Errors: 29033
+Errors Matched: 2.328385
+Matchs: 710, Errors: 31005
+Errors Matched: 2.289953
+Matchs: 658, Errors: 28531
+Errors Matched: 2.306263
+Matchs: 658, Errors: 28531
+Errors Matched: 2.306263
+
+tRCD - Retention zusammenhang:
+100 Rows, 40s Retention 40°C 0xff tRCD = 2 500Mhz, Samsung Chip:
+Matchs: 559, Errors: 27985
+Errors Matched: 1.997499
+Matchs: 683, Errors: 33744
+Errors Matched: 2.024064
+
+
+Retention wiederholbarkeit:
+100 Rows, 40s Retention 40°C 0xff, Micron Chip:
+Matchs: 990, Errors: 1223
+Errors Matched: 80.948486
+Matchs: 990, Errors: 1223
+Errors Matched: 80.948486
+Matchs: 1146, Errors: 1294
+Errors Matched: 88.562599
+Matchs: 1018, Errors: 1224
+Errors Matched: 83.169937
+
+tRCD - Retention zusammenhang:
+100 Rows, 40s Retention 40°C 0xff tRCD = 1 400Mhz, Micron Chip:
+Matchs: 150, Errors: 774
+Errors Matched: 19.379845
+Matchs: 148, Errors: 809
+Errors Matched: 18.294189
+Matchs: 136, Errors: 745
+Errors Matched: 18.255033
+
+tRCD - Retention zusammenhang:
+100 Rows, 40s Retention 40°C 0xff tRCD = 2 500Mhz, Micron Chip:
+Matchs: 149, Errors: 784
+Errors Matched: 19.005102
+Matchs: 162, Errors: 876
+Errors Matched: 18.493151
+Matchs: 155, Errors: 850
+Errors Matched: 18.235294

@@ -117,7 +117,7 @@ void readAndCompareRow(fpga_t *fpga, const uint row, const uint bank,
 
   iseq->execute(fpga);
 
-  //64 bit pattern
+  // 64 bit pattern
 
   uint64_t pattern_64 = 0;
 
@@ -195,9 +195,9 @@ void testRetention(fpga_t *fpga, const int retention)
   // writing the entire row takes approximately 5 ms
   uint group_size = ceil(
       retention / 5.0f); // number of rows to be written in a single iteration
-  uint cur_row_write = 0;
+  uint cur_row_write = 100;
   uint cur_bank_write = 0;
-  uint cur_row_read = 0;
+  uint cur_row_read = 100;
   uint cur_bank_read = 0;
 
   printf("\n");

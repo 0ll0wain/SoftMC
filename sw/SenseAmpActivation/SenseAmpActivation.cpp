@@ -289,7 +289,7 @@ void testSenseAmpActivation(fpga_t *fpga, uint8_t pattern, uint retention)
   uint row = 100;
 
   // Iterate through different tRCD
-  for (size_t tRCD = 1; tRCD < tRCD_max + 1; tRCD++)
+  for (size_t tRCD = 5; tRCD < tRCD_max + 1; tRCD++)
   {
     printf("Testing tRCD: %ld\n", tRCD);
     turnBus(fpga, BUSDIR::WRITE, iseq);

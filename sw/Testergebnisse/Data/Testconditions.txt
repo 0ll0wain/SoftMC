@@ -1,0 +1,3 @@
+Long tests mit 100 Rows Pro testpunkt
+BSP Rows sind immer Bank 0 Row 100
+Retentiontabellen sind Row 100 und tRCD 5 und 400 MHz

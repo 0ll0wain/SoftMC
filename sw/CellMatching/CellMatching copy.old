@@ -7,6 +7,7 @@
 #include "softmc.h"
 #include <fstream>
 #include <unistd.h>
+#include <sstream>
 
 using namespace std;
 
@@ -350,7 +351,7 @@ void readAndCountErrors(fpga_t *fpga, uint8_t pattern, uint64_t *errors)
   }
 }
 
-void cellMatchingTest(fpga_t *fpga, uint8_t pattern, uint retentionTime, uint tRCD)
+void cellMatchingTest(fpga_t *fpga, uint8_t pattern)
 {
   InstructionSequence *iseq = nullptr;
   uint bank = 0;
@@ -360,45 +361,27 @@ void cellMatchingTest(fpga_t *fpga, uint8_t pattern, uint retentionTime, uint tR
   uint64_t timingTestResults[TestedRows][NUM_COLS];
 
   printf("Get Timing Errors\n");
+  turnBus(fpga, BUSDIR::WRITE, iseq);
   for (uint row = 0; row < TestedRows; row++)
   {
-    // Get Failing Cells with tRCD = 1
-    turnBus(fpga, BUSDIR::WRITE, iseq);
+    // Get Failing Cells with tRCD = 1 and save for one row
+
     writeRow(fpga, row, bank, pattern, iseq);
     turnBus(fpga, BUSDIR::READ, iseq);
-    for (uint col = 0; col < NUM_COLS; col += 8)
+    for (uint col = 0; col < NUM_COLS; col++)
     {
-      sendRowColumnReadCommand(fpga, row, bank, col, iseq, tRCD);
+      sendRowColumnReadCommand(fpga, row, bank, col, iseq, 1);
     }
 
     receiveRowData(fpga, timingTestResults[row]);
   }
-
-  printf("Write Data for first Retentiontest\n");
-  // turnBus(fpga, BUSDIR::WRITE, iseq);
-  // for (uint row = 0; row < TestedRows; row++)
-  // { // Test for Weak Cells and check if it matches with step 1
-  //   writeRow(fpga, row, bank, pattern, iseq);
-  // }
-  // for (uint i = retentionTime; i > 0; i--)
-  // {
-  //   printf("Wait. %ds left.\n", i);
-  //   sleep(1);
-  // }
-  // turnBus(fpga, BUSDIR::READ, iseq);
-  // for (uint row = 0; row < TestedRows; row++)
-  // {
-  //   sendRowReadCommand(fpga, row, bank, iseq, 5);
-  //   receiveRowData(fpga, timingTestResults[row]);
-  // }
-
-  // printf("Write Data for second Retentiontest\n");
+  printf("Write Data for Retentiontest\n");
   turnBus(fpga, BUSDIR::WRITE, iseq);
   for (uint row = 0; row < TestedRows; row++)
   { // Test for Weak Cells and check if it matches with step 1
     writeRow(fpga, row, bank, pattern, iseq);
   }
-  for (uint i = retentionTime; i > 0; i--)
+  for (uint i = RETENTION_TIME; i > 0; i--)
   {
     printf("Wait. %ds left.\n", i);
     sleep(1);
@@ -406,52 +389,13 @@ void cellMatchingTest(fpga_t *fpga, uint8_t pattern, uint retentionTime, uint tR
   turnBus(fpga, BUSDIR::READ, iseq);
   for (uint row = 0; row < TestedRows; row++)
   {
+
     sendRowReadCommand(fpga, row, bank, iseq, 5);
     readAndMatch(fpga, pattern, timingTestResults[row], &matchs, &errors);
     // readAndCountErrors(fpga, pattern, &errors);
   }
   printf("Matchs: %ld, Errors: %ld\n", matchs, errors);
   printf("Errors Matched: %f\n", ((float)matchs / (float)errors) * 100);
-}
-
-void retentionLogging(fpga_t *fpga, uint8_t pattern)
-{
-
-  InstructionSequence *iseq = nullptr;
-  uint bank = 0;
-  uint row = 100;
-  uint retentionSteps = 6;
-  uint stepSize = 20;
-  uint64_t testResults[retentionSteps][NUM_COLS];
-
-  ofstream log("retentionResults.csv");
-  log << "Col,20,40,60,80,100,120" << endl;
-
-  for (uint i = 1; i <= retentionSteps; i++)
-  {
-    printf("Start Retention Step %d\n", i);
-    turnBus(fpga, BUSDIR::WRITE, iseq);
-    writeRow(fpga, row, bank, pattern, iseq);
-    turnBus(fpga, BUSDIR::READ, iseq);
-    sleep(stepSize * i);
-    printf("Finnished Retention Step %d\n", i);
-    for (uint j = 0; j < NUM_COLS; j += 8)
-    {
-      sendRowColumnReadCommand(fpga, row, bank, j, iseq, 5);
-    }
-    receiveRowData(fpga, testResults[i - 1]);
-  }
-
-  for (size_t i = 0; i < NUM_COLS; i++)
-  {
-    log << dec << i << hex;
-    for (size_t j = 0; j < retentionSteps; j++)
-    {
-      log << "," << testResults[j][i];
-    }
-    log << endl;
-  }
-  log.close();
 }
 
 // provide trefi = 0 to disable auto-refresh
@@ -510,14 +454,9 @@ int main(int argc, char *argv[])
   usleep(100);
   flushReadFIFO(fpga);
 
-  setCLKspeed(fpga, 10, 1, 4);
-  sleep(1);
-
   uint8_t pattern = 0xff;
 
-  cellMatchingTest(fpga, pattern, 40, 2);
-
-  // retentionLogging(fpga, pattern);
+  cellMatchingTest(fpga, pattern);
 
   printf("The test has been completed! \n");
   fpga_close(fpga);
