@@ -44,7 +44,6 @@ Errors Matched: 19.379845
 Matchs: 148, Errors: 809
 Errors Matched: 18.294189
 Matchs: 136, Errors: 745
-Errors Matched: 18.255033
 
 tRCD - Retention zusammenhang:
 100 Rows, 40s Retention 40°C 0xff tRCD = 2 500Mhz, Micron Chip:
